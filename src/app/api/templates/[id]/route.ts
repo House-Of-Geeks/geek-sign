@@ -111,7 +111,7 @@ export async function PUT(
       }
 
       // Upload new file
-      const blob = await put(`templates/${session.user.id}/${file.name}`, file, {
+      const blob = await put(`templates/${session.user.id}/${Date.now()}-${file.name}`, file, {
         access: "public",
       });
       updates.fileUrl = blob.url;

@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     let fileUrl = null;
     if (file) {
       // Upload file to Vercel Blob
-      const blob = await put(`templates/${session.user.id}/${file.name}`, file, {
+      const blob = await put(`templates/${session.user.id}/${Date.now()}-${file.name}`, file, {
         access: "public",
       });
       fileUrl = blob.url;
