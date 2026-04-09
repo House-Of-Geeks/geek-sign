@@ -381,7 +381,7 @@ export default function SettingsPage() {
             Saved Signature
           </CardTitle>
           <CardDescription>
-            Your signature is saved automatically when you check "Save for next time" while signing a document.
+            Your signature is saved automatically when you check &quot;Save for next time&quot; while signing a document.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -428,7 +428,7 @@ export default function SettingsPage() {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              No saved signature yet. When you sign a document, check "Save for next time" to save it here.
+              No saved signature yet. When you sign a document, check &quot;Save for next time&quot; to save it here.
             </p>
           )}
         </CardContent>
