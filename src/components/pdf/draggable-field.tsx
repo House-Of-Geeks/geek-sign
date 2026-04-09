@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Trash2, Pen, Type, Calendar, CheckSquare, Mail, MapPin, User, GripVertical, FileText } from "lucide-react";
+import { Trash2, Pen, Type, Calendar, CheckSquare, Mail, MapPin, User, GripVertical, FileText, Building2, Phone, Hash, Globe, Map } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface FieldData {
@@ -41,6 +41,15 @@ const fieldIcons: Record<string, typeof Pen> = {
   email: Mail,
   address: MapPin,
   title: User,
+  company: Building2,
+  firstname: User,
+  lastname: User,
+  phone: Phone,
+  abn: Hash,
+  suburb: MapPin,
+  state: Map,
+  postcode: Hash,
+  country: Globe,
   custom: FileText,
 };
 
@@ -54,6 +63,15 @@ const fieldLabels: Record<string, string> = {
   email: "Email",
   address: "Address",
   title: "Title",
+  company: "Company",
+  firstname: "First Name",
+  lastname: "Last Name",
+  phone: "Phone",
+  abn: "ABN",
+  suburb: "Suburb / City",
+  state: "State",
+  postcode: "Postcode",
+  country: "Country",
 };
 
 // Helper to get field type and label for custom fields

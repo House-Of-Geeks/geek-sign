@@ -33,6 +33,11 @@ import {
   ChevronRight,
   ZoomIn,
   ZoomOut,
+  Building2,
+  Phone,
+  Hash,
+  Globe,
+  Map,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -66,11 +71,20 @@ const fieldTypes = [
   { type: "signature", label: "Signature", icon: Pen, width: 200, height: 60 },
   { type: "initials", label: "Initials", icon: Type, width: 80, height: 40 },
   { type: "date", label: "Date", icon: Calendar, width: 120, height: 30 },
+  { type: "checkbox", label: "Checkbox", icon: CheckSquare, width: 24, height: 24 },
   { type: "name", label: "Name", icon: User, width: 150, height: 30 },
   { type: "email", label: "Email", icon: Mail, width: 180, height: 30 },
-  { type: "address", label: "Address", icon: MapPin, width: 200, height: 30 },
   { type: "title", label: "Title", icon: User, width: 150, height: 30 },
-  { type: "checkbox", label: "Checkbox", icon: CheckSquare, width: 24, height: 24 },
+  { type: "company", label: "Company", icon: Building2, width: 180, height: 30 },
+  { type: "firstname", label: "First Name", icon: User, width: 150, height: 30 },
+  { type: "lastname", label: "Last Name", icon: User, width: 150, height: 30 },
+  { type: "phone", label: "Phone", icon: Phone, width: 150, height: 30 },
+  { type: "abn", label: "ABN", icon: Hash, width: 150, height: 30 },
+  { type: "address", label: "Street Address", icon: MapPin, width: 200, height: 30 },
+  { type: "suburb", label: "Suburb / City", icon: MapPin, width: 150, height: 30 },
+  { type: "state", label: "State", icon: Map, width: 100, height: 30 },
+  { type: "postcode", label: "Postcode", icon: Hash, width: 100, height: 30 },
+  { type: "country", label: "Country", icon: Globe, width: 150, height: 30 },
 ];
 
 const recipientColors = [
