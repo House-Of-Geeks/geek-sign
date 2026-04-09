@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Trash2, Pen, Type, Calendar, CheckSquare, Mail, MapPin, User, GripVertical, FileText, Building2, Phone, Hash, Globe, Map, AlignLeft } from "lucide-react";
+import { Trash2, Pen, Type, Calendar, CheckSquare, Mail, MapPin, User, GripVertical, FileText, Building2, Phone, Hash, Globe, Map, AlignLeft, Upload, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface FieldData {
@@ -53,6 +53,8 @@ const fieldIcons: Record<string, typeof Pen> = {
   custom: FileText,
   paragraph: AlignLeft,
   number: Hash,
+  postcodes: Upload,
+  dropdown: ChevronDown,
 };
 
 const fieldLabels: Record<string, string> = {
@@ -76,9 +78,11 @@ const fieldLabels: Record<string, string> = {
   country: "Country",
   paragraph: "Paragraph",
   number: "Number",
+  postcodes: "Postcodes",
+  dropdown: "Dropdown",
 };
 
-// Helper to get field type and label for custom fields
+// Helper to get field type and label for custom/dropdown fields
 export function getFieldTypeInfo(type: string): { baseType: string; label: string } {
   if (type.startsWith("custom:")) {
     return {
@@ -86,10 +90,26 @@ export function getFieldTypeInfo(type: string): { baseType: string; label: strin
       label: type.substring(7), // Remove "custom:" prefix
     };
   }
+  if (type.startsWith("dropdown:")) {
+    const parts = type.split(":");
+    return {
+      baseType: "dropdown",
+      label: parts[1] || "Dropdown",
+    };
+  }
   return {
     baseType: type,
     label: fieldLabels[type] || type,
   };
+}
+
+// Helper to extract dropdown options from the field type string
+// Format: "dropdown:Label:Option1|Option2|Option3"
+export function getDropdownOptions(type: string): string[] {
+  if (!type.startsWith("dropdown:")) return [];
+  const parts = type.split(":");
+  if (parts.length < 3) return [];
+  return parts[2].split("|").filter(Boolean);
 }
 
 // Color palette for recipients

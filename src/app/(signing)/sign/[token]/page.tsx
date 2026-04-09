@@ -37,10 +37,11 @@ import {
   ChevronRight,
   ZoomIn,
   ZoomOut,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { getFieldTypeInfo } from "@/components/pdf/draggable-field";
+import { getFieldTypeInfo, getDropdownOptions } from "@/components/pdf/draggable-field";
 
 // Dynamically import PDF components to avoid SSR issues
 const PdfDocument = dynamic(
@@ -106,6 +107,13 @@ export default function SignPage({ params }: SignPageProps) {
   // Text field modal state
   const [showTextFieldModal, setShowTextFieldModal] = useState(false);
   const [textFieldValue, setTextFieldValue] = useState("");
+
+  // Postcodes modal state
+  const [showPostcodesModal, setShowPostcodesModal] = useState(false);
+  const [postcodesValue, setPostcodesValue] = useState("");
+
+  // Dropdown modal state
+  const [showDropdownModal, setShowDropdownModal] = useState(false);
 
   // PDF state
   const [numPages, setNumPages] = useState(0);
@@ -219,6 +227,11 @@ export default function SignPage({ params }: SignPageProps) {
       return;
     } else if (baseType === "date") {
       handleDateFieldClick(index);
+    } else if (baseType === "postcodes") {
+      setPostcodesValue(field.value || "");
+      setShowPostcodesModal(true);
+    } else if (baseType === "dropdown") {
+      setShowDropdownModal(true);
     } else {
       // Open text field modal for all other field types (name, email, address, company, phone, etc.)
       setTextFieldValue(field.value || "");
@@ -322,6 +335,48 @@ export default function SignPage({ params }: SignPageProps) {
     const updatedFields = [...fields];
     updatedFields[index] = { ...updatedFields[index], value: today };
     setFields(updatedFields);
+  };
+
+  const handlePostcodesSubmit = () => {
+    if (!postcodesValue.trim()) {
+      toast({ title: "Postcodes required", description: "Please enter or upload postcodes.", variant: "destructive" });
+      return;
+    }
+    const updatedFields = [...fields];
+    updatedFields[currentFieldIndex] = { ...updatedFields[currentFieldIndex], value: postcodesValue.trim() };
+    setFields(updatedFields);
+    setShowPostcodesModal(false);
+    setPostcodesValue("");
+    const nextUnsigned = updatedFields.findIndex((f, i) => i > currentFieldIndex && !f.value);
+    if (nextUnsigned !== -1) setCurrentFieldIndex(nextUnsigned);
+  };
+
+  const handlePostcodesFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      // Parse postcodes: split by comma, newline, semicolon, or tab
+      const postcodes = text
+        .split(/[\n,;\t]+/)
+        .map(p => p.trim())
+        .filter(Boolean)
+        .join("\n");
+      setPostcodesValue(postcodes);
+    };
+    reader.readAsText(file);
+    // Reset the input so the same file can be re-uploaded
+    e.target.value = "";
+  };
+
+  const handleDropdownSelect = (option: string) => {
+    const updatedFields = [...fields];
+    updatedFields[currentFieldIndex] = { ...updatedFields[currentFieldIndex], value: option };
+    setFields(updatedFields);
+    setShowDropdownModal(false);
+    const nextUnsigned = updatedFields.findIndex((f, i) => i > currentFieldIndex && !f.value);
+    if (nextUnsigned !== -1) setCurrentFieldIndex(nextUnsigned);
   };
 
   const allFieldsComplete = fields.every(
@@ -1000,6 +1055,94 @@ export default function SignPage({ params }: SignPageProps) {
                     Apply
                   </Button>
                 </div>
+              </>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Postcodes Modal */}
+      <Dialog open={showPostcodesModal} onOpenChange={(open) => { setShowPostcodesModal(open); if (!open) setPostcodesValue(""); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Enter Postcodes</DialogTitle>
+            <DialogDescription>
+              Paste your postcodes below (one per line or comma-separated), or upload a CSV/text file.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Textarea
+              placeholder={"3000\n3001\n3002\nor: 3000, 3001, 3002"}
+              value={postcodesValue}
+              onChange={(e) => setPostcodesValue(e.target.value)}
+              className="min-h-[160px] font-mono text-sm"
+            />
+            <div>
+              <Label htmlFor="postcode-file" className="text-sm text-muted-foreground mb-2 block">
+                Or upload a CSV / text file:
+              </Label>
+              <label
+                htmlFor="postcode-file"
+                className="flex items-center gap-2 cursor-pointer w-fit rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+              >
+                <Upload className="h-4 w-4" />
+                Choose file
+              </label>
+              <input
+                id="postcode-file"
+                type="file"
+                accept=".csv,.txt,.tsv"
+                className="sr-only"
+                onChange={handlePostcodesFileUpload}
+              />
+            </div>
+            {postcodesValue && (
+              <p className="text-xs text-muted-foreground">
+                {postcodesValue.split(/[\n,]+/).filter(p => p.trim()).length} postcode(s) entered
+              </p>
+            )}
+          </div>
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={() => { setShowPostcodesModal(false); setPostcodesValue(""); }} className="flex-1">
+              Cancel
+            </Button>
+            <Button onClick={handlePostcodesSubmit} className="flex-1">
+              Apply
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dropdown Modal */}
+      <Dialog open={showDropdownModal} onOpenChange={setShowDropdownModal}>
+        <DialogContent className="sm:max-w-sm">
+          {(() => {
+            const currentField = fields[currentFieldIndex];
+            const { label: fieldLabel } = currentField ? getFieldTypeInfo(currentField.type) : { label: "Option" };
+            const options = currentField ? getDropdownOptions(currentField.type) : [];
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle>{fieldLabel}</DialogTitle>
+                  <DialogDescription>Select an option below.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-2 py-4">
+                  {options.map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => handleDropdownSelect(option)}
+                      className={cn(
+                        "w-full text-left rounded-lg border px-4 py-3 text-sm transition-colors hover:bg-primary/10 hover:border-primary",
+                        currentField?.value === option && "bg-primary/10 border-primary font-medium"
+                      )}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+                <Button variant="outline" onClick={() => setShowDropdownModal(false)} className="w-full">
+                  Cancel
+                </Button>
               </>
             );
           })()}

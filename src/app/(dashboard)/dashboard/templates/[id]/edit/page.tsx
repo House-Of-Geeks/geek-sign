@@ -48,6 +48,9 @@ import {
   Map,
   Settings2,
   AlignLeft,
+  Upload,
+  ChevronDown,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -99,6 +102,7 @@ const fieldTypes = [
 
   { type: "paragraph", label: "Paragraph", icon: AlignLeft, width: 300, height: 80 },
   { type: "number", label: "Number", icon: Hash, width: 100, height: 30 },
+  { type: "postcodes", label: "Postcodes", icon: Upload, width: 220, height: 50 },
 ];
 
 const recipientColors = [
@@ -132,6 +136,12 @@ export default function TemplateEditorPage() {
   const [customFields, setCustomFields] = useState<Array<{ type: string; label: string }>>([]);
   const [showCustomFieldDialog, setShowCustomFieldDialog] = useState(false);
   const [newCustomFieldLabel, setNewCustomFieldLabel] = useState("");
+
+  // Dropdown field state
+  const [dropdownFields, setDropdownFields] = useState<Array<{ type: string; label: string }>>([]);
+  const [showDropdownDialog, setShowDropdownDialog] = useState(false);
+  const [newDropdownLabel, setNewDropdownLabel] = useState("");
+  const [newDropdownOptions, setNewDropdownOptions] = useState<string[]>(["", ""]);
 
   // PDF state
   const [numPages, setNumPages] = useState(0);
@@ -222,26 +232,28 @@ export default function TemplateEditorPage() {
       const rect = pageContainerRef.current.getBoundingClientRect();
       const standardFieldType = fieldTypes.find(f => f.type === selectedFieldType);
       const customField = customFields.find(f => f.type === selectedFieldType);
-      if (!standardFieldType && !customField) return;
+      const dropdownField = dropdownFields.find(f => f.type === selectedFieldType);
+      if (!standardFieldType && !customField && !dropdownField) return;
 
       const x = (e.clientX - rect.left) / scale;
       const y = (e.clientY - rect.top) / scale;
 
       const width = standardFieldType?.width ?? 180;
-      const height = standardFieldType?.height ?? 30;
+      const height = standardFieldType?.height ?? 36;
 
       const xPosition = Math.max(0, x - width / 2);
       const yPosition = Math.max(0, y - height / 2);
 
       addField(xPosition, yPosition);
     },
-    [selectedFieldType, scale, currentPage, selectedRecipientIndex, customFields]
+    [selectedFieldType, scale, currentPage, selectedRecipientIndex, customFields, dropdownFields]
   );
 
   const addField = (x: number, y: number) => {
     const standardFieldType = fieldTypes.find(f => f.type === selectedFieldType);
     const customField = customFields.find(f => f.type === selectedFieldType);
-    if (!standardFieldType && !customField) return;
+    const dropdownField = dropdownFields.find(f => f.type === selectedFieldType);
+    if (!standardFieldType && !customField && !dropdownField) return;
 
     const newField: TemplateField = {
       id: `field-${Date.now()}`,
@@ -250,7 +262,7 @@ export default function TemplateEditorPage() {
       xPosition: Math.round(x),
       yPosition: Math.round(y),
       width: standardFieldType?.width ?? 180,
-      height: standardFieldType?.height ?? 30,
+      height: standardFieldType?.height ?? 36,
       required: true,
       recipientIndex: selectedRecipientIndex,
     };
@@ -281,6 +293,37 @@ export default function TemplateEditorPage() {
 
   const removeCustomField = (fieldType: string) => {
     setCustomFields(prev => prev.filter(f => f.type !== fieldType));
+    if (selectedFieldType === fieldType) setSelectedFieldType("signature");
+  };
+
+  // Dropdown field handlers
+  const addDropdownField = () => {
+    const label = newDropdownLabel.trim();
+    const options = newDropdownOptions.map(o => o.trim()).filter(Boolean);
+    if (!label) {
+      toast({ title: "Label required", description: "Please enter a label for your dropdown field.", variant: "destructive" });
+      return;
+    }
+    if (options.length < 2) {
+      toast({ title: "Options required", description: "Please add at least 2 options.", variant: "destructive" });
+      return;
+    }
+    const type = `dropdown:${label}:${options.join("|")}`;
+    const existing = dropdownFields.find(f => f.label.toLowerCase() === label.toLowerCase());
+    if (existing) {
+      toast({ title: "Field already exists", description: `A dropdown field named "${label}" already exists.`, variant: "destructive" });
+      return;
+    }
+    setDropdownFields(prev => [...prev, { type, label }]);
+    setSelectedFieldType(type);
+    setNewDropdownLabel("");
+    setNewDropdownOptions(["", ""]);
+    setShowDropdownDialog(false);
+    toast({ title: "Dropdown field added", description: `"${label}" has been added.` });
+  };
+
+  const removeDropdownField = (fieldType: string) => {
+    setDropdownFields(prev => prev.filter(f => f.type !== fieldType));
     if (selectedFieldType === fieldType) setSelectedFieldType("signature");
   };
 
@@ -791,14 +834,50 @@ export default function TemplateEditorPage() {
                   </div>
                 )}
 
-                <Button
-                  variant="outline"
-                  className="w-full mt-3"
-                  onClick={() => setShowCustomFieldDialog(true)}
-                >
-                  <Settings2 className="mr-2 h-4 w-4" />
-                  Add Custom Field
-                </Button>
+                {/* Dropdown Field Buttons */}
+                {dropdownFields.length > 0 && (
+                  <div className="space-y-1 mt-2">
+                    {dropdownFields.map((field) => (
+                      <div key={field.type} className="flex gap-1">
+                        <Button
+                          variant={selectedFieldType === field.type ? "default" : "outline"}
+                          className="flex-1 justify-start text-sm h-8"
+                          onClick={() => setSelectedFieldType(field.type)}
+                        >
+                          <ChevronDown className="mr-2 h-3.5 w-3.5" />
+                          {field.label}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0"
+                          onClick={() => removeDropdownField(field.type)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2 mt-3">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setShowCustomFieldDialog(true)}
+                  >
+                    <Settings2 className="mr-2 h-4 w-4" />
+                    Add Custom Field
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setShowDropdownDialog(true)}
+                  >
+                    <ChevronDown className="mr-2 h-4 w-4" />
+                    Add Dropdown Field
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
@@ -964,6 +1043,75 @@ export default function TemplateEditorPage() {
               Cancel
             </Button>
             <Button onClick={addCustomField}>Add Field</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dropdown Field Dialog */}
+      <Dialog open={showDropdownDialog} onOpenChange={setShowDropdownDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Dropdown Field</DialogTitle>
+            <DialogDescription>
+              Create a dropdown field with predefined options. Signers will select one option.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="dropdown-label-tmpl">Field Label</Label>
+              <Input
+                id="dropdown-label-tmpl"
+                placeholder="e.g. Lead Type, Property Type"
+                value={newDropdownLabel}
+                onChange={(e) => setNewDropdownLabel(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Options</Label>
+              <div className="space-y-2">
+                {newDropdownOptions.map((opt, i) => (
+                  <div key={i} className="flex gap-2">
+                    <Input
+                      placeholder={`Option ${i + 1}`}
+                      value={opt}
+                      onChange={(e) => {
+                        const updated = [...newDropdownOptions];
+                        updated[i] = e.target.value;
+                        setNewDropdownOptions(updated);
+                      }}
+                    />
+                    {newDropdownOptions.length > 2 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setNewDropdownOptions(prev => prev.filter((_, idx) => idx !== i))}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setNewDropdownOptions(prev => [...prev, ""])}
+              >
+                <Plus className="mr-2 h-3 w-3" />
+                Add Option
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowDropdownDialog(false);
+              setNewDropdownLabel("");
+              setNewDropdownOptions(["", ""]);
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={addDropdownField}>Add Field</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

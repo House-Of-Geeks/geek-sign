@@ -50,6 +50,9 @@ import {
   Globe,
   Map,
   AlignLeft,
+  Upload,
+  ChevronDown,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { DraggableField, recipientColors, getFieldTypeInfo, type FieldData } from "@/components/pdf/draggable-field";
@@ -118,6 +121,7 @@ const fieldTypes = [
 
   { type: "paragraph", label: "Paragraph", icon: AlignLeft, width: 300, height: 80 },
   { type: "number", label: "Number", icon: Hash, width: 100, height: 30 },
+  { type: "postcodes", label: "Postcodes", icon: Upload, width: 220, height: 50 },
 ];
 
 export default function DocumentEditorPage({ params }: EditorPageProps) {
@@ -148,6 +152,13 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
   const [customFields, setCustomFields] = useState<Array<{ type: string; label: string }>>([]);
   const [showCustomFieldDialog, setShowCustomFieldDialog] = useState(false);
   const [newCustomFieldLabel, setNewCustomFieldLabel] = useState("");
+
+  // Dropdown field state
+  const [dropdownFields, setDropdownFields] = useState<Array<{ type: string; label: string }>>([]);
+  const [showDropdownDialog, setShowDropdownDialog] = useState(false);
+  const [newDropdownLabel, setNewDropdownLabel] = useState("");
+  const [newDropdownOptions, setNewDropdownOptions] = useState<string[]>(["", ""]);
+
 
   // PDF state
   const [numPages, setNumPages] = useState(0);
@@ -336,15 +347,16 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
 
       const rect = pageContainerRef.current.getBoundingClientRect();
 
-      // Check standard field types or custom fields
+      // Check standard field types, custom fields, or dropdown fields
       const standardFieldType = fieldTypes.find(f => f.type === selectedFieldType);
       const customField = customFields.find(f => f.type === selectedFieldType);
+      const dropdownField = dropdownFields.find(f => f.type === selectedFieldType);
 
-      // Default dimensions for custom fields
-      const width = standardFieldType?.width || 150;
-      const height = standardFieldType?.height || 30;
+      // Default dimensions for custom/dropdown fields
+      const width = standardFieldType?.width || 180;
+      const height = standardFieldType?.height || 36;
 
-      if (!standardFieldType && !customField) return;
+      if (!standardFieldType && !customField && !dropdownField) return;
 
       // Calculate click position relative to the unscaled PDF
       const x = (e.clientX - rect.left) / scale;
@@ -356,19 +368,20 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
 
       addField(selectedRecipientId, xPosition, yPosition);
     },
-    [selectedRecipientId, selectedFieldType, scale, currentPage, customFields]
+    [selectedRecipientId, selectedFieldType, scale, currentPage, customFields, dropdownFields]
   );
 
   const addField = async (recipientId: string, x: number, y: number) => {
-    // Check if it's a standard field type or custom field
+    // Check if it's a standard field type, custom field, or dropdown field
     const standardFieldType = fieldTypes.find(f => f.type === selectedFieldType);
     const customField = customFields.find(f => f.type === selectedFieldType);
+    const dropdownField = dropdownFields.find(f => f.type === selectedFieldType);
 
-    // Get dimensions - custom fields default to text field size
-    const width = standardFieldType?.width || 150;
-    const height = standardFieldType?.height || 30;
+    // Get dimensions - custom/dropdown fields default to text field size
+    const width = standardFieldType?.width || 180;
+    const height = standardFieldType?.height || 36;
 
-    if (!standardFieldType && !customField) return;
+    if (!standardFieldType && !customField && !dropdownField) return;
 
     // Optimistic update
     const tempId = `temp-${Date.now()}`;
@@ -593,6 +606,40 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
     if (selectedFieldType === fieldType) {
       setSelectedFieldType("signature");
     }
+  };
+
+  // Dropdown field handlers
+  const addDropdownField = () => {
+    const label = newDropdownLabel.trim();
+    const options = newDropdownOptions.map(o => o.trim()).filter(Boolean);
+
+    if (!label) {
+      toast({ title: "Label required", description: "Please enter a label for your dropdown field.", variant: "destructive" });
+      return;
+    }
+    if (options.length < 2) {
+      toast({ title: "Options required", description: "Please add at least 2 options.", variant: "destructive" });
+      return;
+    }
+
+    const type = `dropdown:${label}:${options.join("|")}`;
+    const existing = dropdownFields.find(f => f.label.toLowerCase() === label.toLowerCase());
+    if (existing) {
+      toast({ title: "Field already exists", description: `A dropdown field named "${label}" already exists.`, variant: "destructive" });
+      return;
+    }
+
+    setDropdownFields(prev => [...prev, { type, label }]);
+    setSelectedFieldType(type);
+    setNewDropdownLabel("");
+    setNewDropdownOptions(["", ""]);
+    setShowDropdownDialog(false);
+    toast({ title: "Dropdown field added", description: `"${label}" has been added to your field types.` });
+  };
+
+  const removeDropdownField = (fieldType: string) => {
+    setDropdownFields(prev => prev.filter(f => f.type !== fieldType));
+    if (selectedFieldType === fieldType) setSelectedFieldType("signature");
   };
 
   // Get fields for current page
@@ -852,6 +899,16 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
                   Add Custom Field
                 </Button>
 
+                {/* Add Dropdown Field Button */}
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setShowDropdownDialog(true)}
+                >
+                  <ChevronDown className="mr-2 h-4 w-4" />
+                  Add Dropdown Field
+                </Button>
+
                 {/* Field Type Buttons */}
                 <div className="space-y-2">
                   {fieldTypes.map((field) => (
@@ -884,6 +941,29 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
                         size="icon"
                         className="shrink-0"
                         onClick={() => removeCustomField(field.type)}
+                      >
+                        <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+
+                  {/* Dropdown Field Buttons */}
+                  {dropdownFields.map((field) => (
+                    <div key={field.type} className="flex gap-1">
+                      <Button
+                        variant={selectedFieldType === field.type ? "default" : "outline"}
+                        className="flex-1 justify-start"
+                        onClick={() => setSelectedFieldType(field.type)}
+                        disabled={!selectedRecipientId}
+                      >
+                        <ChevronDown className="mr-2 h-4 w-4" />
+                        {field.label}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0"
+                        onClick={() => removeDropdownField(field.type)}
                       >
                         <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                       </Button>
@@ -1190,6 +1270,77 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
               Cancel
             </Button>
             <Button onClick={addCustomField}>
+              Add Field
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dropdown Field Dialog */}
+      <Dialog open={showDropdownDialog} onOpenChange={setShowDropdownDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Dropdown Field</DialogTitle>
+            <DialogDescription>
+              Create a dropdown field with predefined options. Signers will select one option.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="dropdown-label">Field Label</Label>
+              <Input
+                id="dropdown-label"
+                placeholder="e.g. Lead Type, Property Type"
+                value={newDropdownLabel}
+                onChange={(e) => setNewDropdownLabel(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Options</Label>
+              <div className="space-y-2">
+                {newDropdownOptions.map((opt, i) => (
+                  <div key={i} className="flex gap-2">
+                    <Input
+                      placeholder={`Option ${i + 1}`}
+                      value={opt}
+                      onChange={(e) => {
+                        const updated = [...newDropdownOptions];
+                        updated[i] = e.target.value;
+                        setNewDropdownOptions(updated);
+                      }}
+                    />
+                    {newDropdownOptions.length > 2 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setNewDropdownOptions(prev => prev.filter((_, idx) => idx !== i))}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setNewDropdownOptions(prev => [...prev, ""])}
+              >
+                <Plus className="mr-2 h-3 w-3" />
+                Add Option
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowDropdownDialog(false);
+              setNewDropdownLabel("");
+              setNewDropdownOptions(["", ""]);
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={addDropdownField}>
               Add Field
             </Button>
           </DialogFooter>
