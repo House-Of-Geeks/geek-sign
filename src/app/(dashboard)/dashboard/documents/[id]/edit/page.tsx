@@ -98,6 +98,7 @@ const fieldTypes = [
   { type: "signature", label: "Signature", icon: Pen, width: 200, height: 60 },
   { type: "initials", label: "Initials", icon: Type, width: 80, height: 40 },
   { type: "date", label: "Date", icon: Calendar, width: 120, height: 30 },
+  { type: "date_auto", label: "Signing Date", icon: Calendar, width: 120, height: 30 },
   { type: "checkbox", label: "Checkbox", icon: CheckSquare, width: 24, height: 24 },
   { type: "name", label: "Name", icon: User, width: 150, height: 30 },
   { type: "email", label: "Email", icon: Mail, width: 180, height: 30 },

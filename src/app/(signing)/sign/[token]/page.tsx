@@ -139,7 +139,11 @@ export default function SignPage({ params }: SignPageProps) {
 
         setDocument(data.document);
         setRecipient(data.recipient);
-        setFields(data.fields || []);
+        // Auto-fill date_auto fields with today's date
+        const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+        setFields((data.fields || []).map((f: { type: string; value?: string | null }) =>
+          f.type === "date_auto" ? { ...f, value: today } : f
+        ));
         setSavedSignature(data.savedSignature ?? null);
         setSavedInitials(data.savedInitials ?? null);
 
@@ -209,6 +213,9 @@ export default function SignPage({ params }: SignPageProps) {
 
     if (baseType === "signature" || baseType === "initials") {
       setShowSignatureModal(true);
+    } else if (baseType === "date_auto") {
+      // Auto-filled — nothing for signer to do
+      return;
     } else if (baseType === "date") {
       handleDateFieldClick(index);
     } else {
@@ -546,12 +553,12 @@ export default function SignPage({ params }: SignPageProps) {
                     >
                       {baseType === "signature" && <Pen className="h-4 w-4" />}
                       {baseType === "initials" && <Type className="h-4 w-4" />}
-                      {baseType === "date" && <Calendar className="h-4 w-4" />}
+                      {(baseType === "date" || baseType === "date_auto") && <Calendar className="h-4 w-4" />}
                       {(baseType === "text" || baseType === "name" || baseType === "email" || baseType === "address" || baseType === "title" || baseType === "custom") && <Type className="h-4 w-4" />}
                       <div className="flex-1">
                         <p className="text-sm font-medium">{fieldLabel}</p>
                         <p className="text-xs text-muted-foreground">
-                          {field.value ? "Completed" : "Click to fill"}
+                          {baseType === "date_auto" ? "Auto-filled" : field.value ? "Completed" : "Click to fill"}
                         </p>
                       </div>
                       {field.value && (
