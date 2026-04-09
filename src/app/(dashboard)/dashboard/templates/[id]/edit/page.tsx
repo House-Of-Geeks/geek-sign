@@ -82,6 +82,7 @@ const fieldTypes = [
   { type: "initials", label: "Initials", icon: Type, width: 80, height: 40 },
   { type: "date", label: "Date", icon: Calendar, width: 120, height: 30 },
   { type: "checkbox", label: "Checkbox", icon: CheckSquare, width: 24, height: 24 },
+  { type: "text", label: "Text", icon: Type, width: 200, height: 30 },
   { type: "name", label: "Name", icon: User, width: 150, height: 30 },
   { type: "email", label: "Email", icon: Mail, width: 180, height: 30 },
   { type: "title", label: "Title", icon: User, width: 150, height: 30 },
@@ -823,6 +824,35 @@ export default function TemplateEditorPage() {
                         <div className="text-xs text-muted-foreground">
                           Page {field.page}, Position: ({Math.round(field.xPosition)}, {Math.round(field.yPosition)})
                         </div>
+                        {!["signature", "initials", "date", "date_auto", "checkbox"].includes(field.type) && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium">Field type</p>
+                            <select
+                              className="w-full text-xs border rounded px-2 py-1.5 bg-background"
+                              value={field.type}
+                              onChange={(e) => {
+                                setFields(prev => prev.map(f => f.id === selectedFieldId ? { ...f, type: e.target.value } : f));
+                                setHasChanges(true);
+                              }}
+                            >
+                              <option value="text">Text (generic)</option>
+                              <option value="paragraph">Paragraph</option>
+                              <option value="number">Number</option>
+                              <option value="name">Name</option>
+                              <option value="firstname">First Name</option>
+                              <option value="lastname">Last Name</option>
+                              <option value="email">Email</option>
+                              <option value="phone">Phone</option>
+                              <option value="company">Company</option>
+                              <option value="title">Title</option>
+                              <option value="address">Street Address</option>
+                              <option value="suburb">Suburb / City</option>
+                              <option value="state">State</option>
+                              <option value="postcode">Postcode</option>
+                              <option value="country">Country</option>
+                            </select>
+                          </div>
+                        )}
                         <div className="space-y-1">
                           <p className="text-xs font-medium">Required</p>
                           <div className="flex rounded-md overflow-hidden border text-xs">

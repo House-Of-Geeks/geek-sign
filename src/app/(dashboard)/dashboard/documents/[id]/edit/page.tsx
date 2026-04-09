@@ -101,6 +101,7 @@ const fieldTypes = [
   { type: "initials", label: "Initials", icon: Type, width: 80, height: 40 },
   { type: "date", label: "Date", icon: Calendar, width: 120, height: 30 },
   { type: "checkbox", label: "Checkbox", icon: CheckSquare, width: 24, height: 24 },
+  { type: "text", label: "Text", icon: Type, width: 200, height: 30 },
   { type: "name", label: "Name", icon: User, width: 150, height: 30 },
   { type: "email", label: "Email", icon: Mail, width: 180, height: 30 },
   { type: "title", label: "Title", icon: User, width: 150, height: 30 },
@@ -1016,6 +1017,42 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
                               <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                             </Button>
                           </div>
+                          {selectedFieldId === field.id && !["signature", "initials", "date", "date_auto", "checkbox"].includes(field.type) && (
+                            <div className="mx-1">
+                              <p className="text-xs text-muted-foreground font-medium mb-1">Field type</p>
+                              <select
+                                className="w-full text-xs border rounded px-2 py-1.5 bg-background mb-2"
+                                value={field.type}
+                                onChange={(e) => {
+                                  const newType = e.target.value;
+                                  setFields(prev => prev.map(f => f.id === field.id ? { ...f, type: newType } : f));
+                                  if (!field.id.startsWith("temp-")) {
+                                    fetch(`/api/documents/${params.id}/fields/${field.id}`, {
+                                      method: "PATCH",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ type: newType }),
+                                    }).catch(console.error);
+                                  }
+                                }}
+                              >
+                                <option value="text">Text (generic)</option>
+                                <option value="paragraph">Paragraph</option>
+                                <option value="number">Number</option>
+                                <option value="name">Name</option>
+                                <option value="firstname">First Name</option>
+                                <option value="lastname">Last Name</option>
+                                <option value="email">Email</option>
+                                <option value="phone">Phone</option>
+                                <option value="company">Company</option>
+                                <option value="title">Title</option>
+                                <option value="address">Street Address</option>
+                                <option value="suburb">Suburb / City</option>
+                                <option value="state">State</option>
+                                <option value="postcode">Postcode</option>
+                                <option value="country">Country</option>
+                              </select>
+                            </div>
+                          )}
                           {selectedFieldId === field.id && !["signature", "initials", "date", "date_auto", "checkbox"].includes(field.type) && (
                             <div className="space-y-1 mx-1 pb-1">
                               <p className="text-xs text-muted-foreground font-medium">Pre-fill text (optional)</p>
