@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Card,
@@ -129,6 +130,16 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
   const [canResizeFields, setCanResizeFields] = useState(false);
 
   // Custom field state
+  const [prefillEditValue, setPrefillEditValue] = useState<string>("");
+  // Sync prefill edit value when selected field changes
+  useEffect(() => {
+    if (selectedFieldId) {
+      const f = fields.find(x => x.id === selectedFieldId);
+      setPrefillEditValue(f?.value || "");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFieldId]);
+
   const [customFields, setCustomFields] = useState<Array<{ type: string; label: string }>>([]);
   const [showCustomFieldDialog, setShowCustomFieldDialog] = useState(false);
   const [newCustomFieldLabel, setNewCustomFieldLabel] = useState("");
@@ -1001,6 +1012,30 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
                               <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                             </Button>
                           </div>
+                          {selectedFieldId === field.id && !["signature", "initials", "date", "date_auto", "checkbox"].includes(field.type) && (
+                            <div className="space-y-1 mx-1 pb-1">
+                              <p className="text-xs text-muted-foreground font-medium">Pre-fill text (optional)</p>
+                              <Textarea
+                                value={prefillEditValue}
+                                onChange={(e) => setPrefillEditValue(e.target.value)}
+                                onBlur={() => {
+                                  // Save value on blur
+                                  setFields(prev => prev.map(f => f.id === field.id ? { ...f, value: prefillEditValue || null } : f));
+                                  if (!field.id.startsWith("temp-")) {
+                                    fetch(`/api/documents/${params.id}/fields/${field.id}`, {
+                                      method: "PATCH",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ value: prefillEditValue || null }),
+                                    }).catch(console.error);
+                                  }
+                                }}
+                                placeholder="Leave blank for signer to fill..."
+                                className="text-xs min-h-[60px] resize-none"
+                                rows={3}
+                              />
+                              <p className="text-[10px] text-muted-foreground">Recipient can still edit this before signing</p>
+                            </div>
+                          )}
                           {selectedFieldId === field.id && (field.type === "date" || field.type === "date_auto") && (
                             <div className="flex rounded-md overflow-hidden border text-xs mx-1">
                               <button
