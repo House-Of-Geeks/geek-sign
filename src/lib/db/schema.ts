@@ -187,6 +187,7 @@ export const templates = pgTable("templates", {
   description: text("description"),
   fileUrl: text("file_url"),
   fields: jsonb("fields"),
+  recipientSlots: jsonb("recipient_slots"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

@@ -55,11 +55,23 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
+interface RecipientSlot {
+  index: number;
+  preAssignedEmail: string | null;
+  preAssignedName: string | null;
+}
+
+interface TemplateFieldInfo {
+  recipientIndex?: number;
+}
+
 interface Template {
   id: string;
   name: string;
   description: string | null;
   fileUrl: string | null;
+  fields: TemplateFieldInfo[] | null;
+  recipientSlots: RecipientSlot[] | null;
   createdAt: string;
 }
 
@@ -85,9 +97,9 @@ export default function TemplatesPage() {
   const [useTemplateId, setUseTemplateId] = useState<string | null>(null);
   const [useTemplateData, setUseTemplateData] = useState({
     title: "",
-    recipients: "",
     customMessage: "",
   });
+  const [useTemplateSlots, setUseTemplateSlots] = useState<Array<{ email: string; name: string }>>([{ email: "", name: "" }]);
   const [isCreatingDocument, setIsCreatingDocument] = useState(false);
 
   useEffect(() => {
@@ -160,11 +172,6 @@ export default function TemplatesPage() {
   const handleUseTemplate = async () => {
     if (!useTemplateId) return;
 
-    const recipientEmails = useTemplateData.recipients
-      .split(",")
-      .map((e) => e.trim())
-      .filter((e) => e);
-
     if (!useTemplateData.title) {
       toast({
         title: "Title required",
@@ -173,6 +180,10 @@ export default function TemplatesPage() {
       });
       return;
     }
+
+    const recipientEmails = useTemplateSlots
+      .filter((s) => s.email.trim())
+      .map((s) => ({ email: s.email.trim(), name: s.name.trim() || undefined }));
 
     if (recipientEmails.length === 0) {
       toast({
@@ -190,7 +201,7 @@ export default function TemplatesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: useTemplateData.title,
-          recipientEmails: recipientEmails.map((email) => ({ email })),
+          recipientEmails,
           customMessage: useTemplateData.customMessage || undefined,
         }),
       });
@@ -220,7 +231,8 @@ export default function TemplatesPage() {
     } finally {
       setIsCreatingDocument(false);
       setUseTemplateId(null);
-      setUseTemplateData({ title: "", recipients: "", customMessage: "" });
+      setUseTemplateData({ title: "", customMessage: "" });
+      setUseTemplateSlots([{ email: "", name: "" }]);
     }
   };
 
@@ -320,11 +332,18 @@ export default function TemplatesPage() {
                     <DropdownMenuItem
                       onClick={() => {
                         setUseTemplateId(template.id);
-                        setUseTemplateData({
-                          title: template.name,
-                          recipients: "",
-                          customMessage: "",
-                        });
+                        setUseTemplateData({ title: template.name, customMessage: "" });
+                        // Compute slot count from fields and recipientSlots
+                        const slots = template.recipientSlots || [];
+                        const fields = template.fields || [];
+                        const maxFieldIndex = fields.reduce((max, f) => Math.max(max, f.recipientIndex ?? 0), 0);
+                        const numSlots = Math.max(1, slots.length, fields.length > 0 ? maxFieldIndex + 1 : 0);
+                        setUseTemplateSlots(
+                          Array.from({ length: numSlots }).map((_, i) => ({
+                            email: slots[i]?.preAssignedEmail || "",
+                            name: slots[i]?.preAssignedName || "",
+                          }))
+                        );
                       }}
                     >
                       <Copy className="mr-2 h-4 w-4" />
@@ -413,7 +432,8 @@ export default function TemplatesPage() {
         open={!!useTemplateId}
         onOpenChange={() => {
           setUseTemplateId(null);
-          setUseTemplateData({ title: "", recipients: "", customMessage: "" });
+          setUseTemplateData({ title: "", customMessage: "" });
+          setUseTemplateSlots([{ email: "", name: "" }]);
         }}
       >
         <DialogContent>
@@ -435,21 +455,37 @@ export default function TemplatesPage() {
                 placeholder="Enter document title"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="recipients">
-                Recipient Emails (comma-separated)
-              </Label>
-              <Input
-                id="recipients"
-                value={useTemplateData.recipients}
-                onChange={(e) =>
-                  setUseTemplateData({
-                    ...useTemplateData,
-                    recipients: e.target.value,
-                  })
-                }
-                placeholder="email1@example.com, email2@example.com"
-              />
+            <div className="space-y-3">
+              {useTemplateSlots.map((slot, index) => (
+                <div key={index} className="space-y-1">
+                  <Label>
+                    {useTemplateSlots.length > 1 ? `Recipient ${index + 1}` : "Recipient"}
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="email"
+                      value={slot.email}
+                      onChange={(e) => {
+                        const updated = [...useTemplateSlots];
+                        updated[index] = { ...updated[index], email: e.target.value };
+                        setUseTemplateSlots(updated);
+                      }}
+                      placeholder="email@example.com"
+                      className="flex-1"
+                    />
+                    <Input
+                      value={slot.name}
+                      onChange={(e) => {
+                        const updated = [...useTemplateSlots];
+                        updated[index] = { ...updated[index], name: e.target.value };
+                        setUseTemplateSlots(updated);
+                      }}
+                      placeholder="Name (optional)"
+                      className="w-36"
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
             <div className="space-y-2">
               <Label htmlFor="message">Custom Message (optional)</Label>

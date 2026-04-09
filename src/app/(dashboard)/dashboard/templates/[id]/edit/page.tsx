@@ -119,6 +119,8 @@ export default function TemplateEditorPage() {
   const [selectedFieldType, setSelectedFieldType] = useState("signature");
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [numRecipientSlots, setNumRecipientSlots] = useState(1);
+  const [slotAssignments, setSlotAssignments] = useState<Array<{ email: string; name: string }>>([]);
+  const [teamMembersList, setTeamMembersList] = useState<Array<{ userId: string; user: { name: string | null; email: string } }>>([]);
 
   // Custom field state
   const [customFields, setCustomFields] = useState<Array<{ type: string; label: string }>>([]);
@@ -148,6 +150,11 @@ export default function TemplateEditorPage() {
       return;
     }
     fetchTemplate();
+    // Fetch team members for pre-assignment dropdowns
+    fetch("/api/team/members")
+      .then((r) => r.ok ? r.json() : { members: [] })
+      .then((data) => setTeamMembersList(data.members || []))
+      .catch(() => {});
   }, [templateId, session, status]);
 
   const fetchTemplate = async () => {
@@ -160,7 +167,19 @@ export default function TemplateEditorPage() {
         setFields(templateFields);
         // Calculate number of recipient slots based on existing fields
         const maxRecipientIndex = templateFields.reduce((max, f) => Math.max(max, f.recipientIndex || 0), 0);
-        setNumRecipientSlots(Math.max(1, maxRecipientIndex + 1));
+        const numSlots = Math.max(1, maxRecipientIndex + 1);
+        setNumRecipientSlots(numSlots);
+        // Load pre-assigned recipients
+        if (data.recipientSlots && Array.isArray(data.recipientSlots)) {
+          setSlotAssignments(
+            (data.recipientSlots as Array<{ preAssignedEmail: string | null; preAssignedName: string | null }>).map((s) => ({
+              email: s.preAssignedEmail || "",
+              name: s.preAssignedName || "",
+            }))
+          );
+        } else {
+          setSlotAssignments(Array.from({ length: numSlots }).map(() => ({ email: "", name: "" })));
+        }
       } else if (response.status === 404) {
         toast({
           title: "Template not found",
@@ -280,6 +299,12 @@ export default function TemplateEditorPage() {
       formData.append("name", template.name);
       formData.append("description", template.description || "");
       formData.append("fields", JSON.stringify(fields));
+      const recipientSlotsData = Array.from({ length: numRecipientSlots }).map((_, index) => ({
+        index,
+        preAssignedEmail: slotAssignments[index]?.email || null,
+        preAssignedName: slotAssignments[index]?.name || null,
+      }));
+      formData.append("recipientSlots", JSON.stringify(recipientSlotsData));
 
       const response = await fetch(`/api/templates/${templateId}`, {
         method: "PUT",
@@ -574,11 +599,52 @@ export default function TemplateEditorPage() {
                   ))}
                 </div>
 
+                {/* Pre-assign to team members */}
+                {teamMembersList.length > 0 && (
+                  <div className="space-y-2 border-t pt-2 mt-1">
+                    <p className="text-xs text-muted-foreground font-medium">Pre-assign recipients</p>
+                    {Array.from({ length: numRecipientSlots }).map((_, index) => (
+                      <div key={index} className="space-y-1">
+                        <div className="flex items-center gap-1">
+                          <div className={cn("w-2 h-2 rounded-full flex-shrink-0", recipientColors[index % recipientColors.length])} />
+                          <span className="text-xs text-muted-foreground">Slot {index + 1}</span>
+                        </div>
+                        <select
+                          className="w-full text-xs border rounded px-2 py-1 bg-background"
+                          value={slotAssignments[index]?.email || ""}
+                          onChange={(e) => {
+                            const selectedEmail = e.target.value;
+                            const member = teamMembersList.find((m) => m.user.email === selectedEmail);
+                            const updated = [...slotAssignments];
+                            while (updated.length <= index) updated.push({ email: "", name: "" });
+                            updated[index] = {
+                              email: selectedEmail,
+                              name: member?.user.name || "",
+                            };
+                            setSlotAssignments(updated);
+                            setHasChanges(true);
+                          }}
+                        >
+                          <option value="">— Not pre-assigned —</option>
+                          {teamMembersList.map((m) => (
+                            <option key={m.userId} value={m.user.email}>
+                              {m.user.name ? `${m.user.name} (${m.user.email})` : m.user.email}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 <Button
                   variant="outline"
                   size="sm"
                   className="w-full"
-                  onClick={() => setNumRecipientSlots(prev => prev + 1)}
+                  onClick={() => {
+                    setNumRecipientSlots(prev => prev + 1);
+                    setSlotAssignments(prev => [...prev, { email: "", name: "" }]);
+                  }}
                 >
                   <Plus className="mr-2 h-4 w-4" />
                   Add Recipient Slot
@@ -594,6 +660,7 @@ export default function TemplateEditorPage() {
                       const lastIndex = numRecipientSlots - 1;
                       setFields(prev => prev.filter(f => f.recipientIndex !== lastIndex));
                       setNumRecipientSlots(prev => prev - 1);
+                      setSlotAssignments(prev => prev.slice(0, lastIndex));
                       if (selectedRecipientIndex >= lastIndex) {
                         setSelectedRecipientIndex(lastIndex - 1);
                       }

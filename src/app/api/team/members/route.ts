@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { teams, teamMembers, users } from "@/lib/db/schema";
+import { teamMembers, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 export async function GET() {
@@ -12,17 +12,17 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Find team where user is owner
-    const [team] = await db
-      .select()
-      .from(teams)
-      .where(eq(teams.ownerId, session.user.id))
-      .limit(1);
+    // Find teams the user belongs to (as member or owner)
+    const memberships = await db
+      .select({ teamId: teamMembers.teamId })
+      .from(teamMembers)
+      .where(eq(teamMembers.userId, session.user.id));
 
-    if (!team) {
-      // Return empty members if no team exists
+    if (memberships.length === 0) {
       return NextResponse.json({ members: [] });
     }
+
+    const teamId = memberships[0].teamId;
 
     // Fetch team members with user details
     const members = await db
@@ -38,7 +38,7 @@ export async function GET() {
       })
       .from(teamMembers)
       .innerJoin(users, eq(teamMembers.userId, users.id))
-      .where(eq(teamMembers.teamId, team.id));
+      .where(eq(teamMembers.teamId, teamId));
 
     return NextResponse.json({ members });
   } catch (error) {

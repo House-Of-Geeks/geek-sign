@@ -91,6 +91,7 @@ export async function PUT(
     const description = formData.get("description") as string;
     const file = formData.get("file") as File | null;
     const fieldsJson = formData.get("fields") as string | null;
+    const recipientSlotsJson = formData.get("recipientSlots") as string | null;
 
     const updates: Partial<typeof templates.$inferInsert> = {
       updatedAt: new Date(),
@@ -124,6 +125,14 @@ export async function PUT(
           { error: "Invalid fields JSON" },
           { status: 400 }
         );
+      }
+    }
+
+    if (recipientSlotsJson) {
+      try {
+        updates.recipientSlots = JSON.parse(recipientSlotsJson);
+      } catch {
+        // ignore parse errors
       }
     }
 

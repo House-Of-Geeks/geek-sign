@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { templates, documents, recipients, documentFields } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { templates, documents, recipients, documentFields, teamMembers } from "@/lib/db/schema";
+import { eq, and, or, inArray } from "drizzle-orm";
 import { put } from "@vercel/blob";
+
+async function getTeamIds(userId: string): Promise<string[]> {
+  const memberships = await db
+    .select({ teamId: teamMembers.teamId })
+    .from(teamMembers)
+    .where(eq(teamMembers.userId, userId));
+  return memberships.map((m) => m.teamId);
+}
 
 interface TemplateField {
   type: string;
@@ -29,12 +37,18 @@ export async function POST(
 
     const { id } = await params;
 
-    // Get the template
+    // Get the template (own or team)
+    const teamIds = await getTeamIds(session.user.id);
     const [template] = await db
       .select()
       .from(templates)
       .where(
-        and(eq(templates.id, id), eq(templates.userId, session.user.id))
+        and(
+          eq(templates.id, id),
+          teamIds.length > 0
+            ? or(eq(templates.userId, session.user.id), inArray(templates.teamId, teamIds))
+            : eq(templates.userId, session.user.id)
+        )
       )
       .limit(1);
 
