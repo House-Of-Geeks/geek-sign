@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Trash2, Pen, Type, Calendar, CheckSquare, Mail, MapPin, User, GripVertical, FileText, Building2, Phone, Hash, Globe, Map } from "lucide-react";
+import { Trash2, Pen, Type, Calendar, CheckSquare, Mail, MapPin, User, GripVertical, FileText, Building2, Phone, Hash, Globe, Map, AlignLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface FieldData {
@@ -51,6 +51,8 @@ const fieldIcons: Record<string, typeof Pen> = {
   postcode: Hash,
   country: Globe,
   custom: FileText,
+  paragraph: AlignLeft,
+  number: Hash,
 };
 
 const fieldLabels: Record<string, string> = {
@@ -72,6 +74,8 @@ const fieldLabels: Record<string, string> = {
   state: "State",
   postcode: "Postcode",
   country: "Country",
+  paragraph: "Paragraph",
+  number: "Number",
 };
 
 // Helper to get field type and label for custom fields

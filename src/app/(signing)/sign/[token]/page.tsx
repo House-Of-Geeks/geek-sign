@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -963,18 +964,28 @@ export default function SignPage({ params }: SignPageProps) {
                     <Label htmlFor="textfield">
                       {fieldLabel}
                     </Label>
-                    <Input
-                      id="textfield"
-                      placeholder={`Enter your ${fieldLabel.toLowerCase()}`}
-                      value={textFieldValue}
-                      onChange={(e) => setTextFieldValue(e.target.value)}
-                      className="text-lg"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          handleTextFieldSubmit();
-                        }
-                      }}
-                    />
+                    {currentField?.type === "paragraph" ? (
+                      <Textarea
+                        id="textfield"
+                        placeholder={`Enter ${fieldLabel.toLowerCase()}...`}
+                        value={textFieldValue}
+                        onChange={(e) => setTextFieldValue(e.target.value)}
+                        className="text-base min-h-[120px]"
+                        rows={5}
+                      />
+                    ) : (
+                      <Input
+                        id="textfield"
+                        type={currentField?.type === "number" ? "number" : "text"}
+                        placeholder={`Enter your ${fieldLabel.toLowerCase()}`}
+                        value={textFieldValue}
+                        onChange={(e) => setTextFieldValue(e.target.value)}
+                        className="text-lg"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleTextFieldSubmit();
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-3">

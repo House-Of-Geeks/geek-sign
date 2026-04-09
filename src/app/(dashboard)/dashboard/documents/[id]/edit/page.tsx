@@ -49,6 +49,7 @@ import {
   Hash,
   Globe,
   Map,
+  AlignLeft,
 } from "lucide-react";
 import Link from "next/link";
 import { DraggableField, recipientColors, getFieldTypeInfo, type FieldData } from "@/components/pdf/draggable-field";
@@ -113,6 +114,9 @@ const fieldTypes = [
   { type: "state", label: "State", icon: Map, width: 100, height: 30 },
   { type: "postcode", label: "Postcode", icon: Hash, width: 100, height: 30 },
   { type: "country", label: "Country", icon: Globe, width: 150, height: 30 },
+
+  { type: "paragraph", label: "Paragraph", icon: AlignLeft, width: 300, height: 80 },
+  { type: "number", label: "Number", icon: Hash, width: 100, height: 30 },
 ];
 
 export default function DocumentEditorPage({ params }: EditorPageProps) {

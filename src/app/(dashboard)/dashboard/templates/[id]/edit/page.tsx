@@ -43,9 +43,11 @@ import {
   ZoomOut,
   Building2,
   Phone,
+  Hash,
   Globe,
   Map,
   Settings2,
+  AlignLeft,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -93,6 +95,9 @@ const fieldTypes = [
   { type: "state", label: "State", icon: Map, width: 100, height: 30 },
   { type: "postcode", label: "Postcode", icon: Type, width: 100, height: 30 },
   { type: "country", label: "Country", icon: Globe, width: 150, height: 30 },
+
+  { type: "paragraph", label: "Paragraph", icon: AlignLeft, width: 300, height: 80 },
+  { type: "number", label: "Number", icon: Hash, width: 100, height: 30 },
 ];
 
 const recipientColors = [
