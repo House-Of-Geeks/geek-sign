@@ -14,6 +14,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft,
@@ -35,9 +43,9 @@ import {
   ZoomOut,
   Building2,
   Phone,
-  Hash,
   Globe,
   Map,
+  Settings2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -79,11 +87,11 @@ const fieldTypes = [
   { type: "firstname", label: "First Name", icon: User, width: 150, height: 30 },
   { type: "lastname", label: "Last Name", icon: User, width: 150, height: 30 },
   { type: "phone", label: "Phone", icon: Phone, width: 150, height: 30 },
-  { type: "abn", label: "ABN", icon: Hash, width: 150, height: 30 },
+
   { type: "address", label: "Street Address", icon: MapPin, width: 200, height: 30 },
   { type: "suburb", label: "Suburb / City", icon: MapPin, width: 150, height: 30 },
   { type: "state", label: "State", icon: Map, width: 100, height: 30 },
-  { type: "postcode", label: "Postcode", icon: Hash, width: 100, height: 30 },
+  { type: "postcode", label: "Postcode", icon: Type, width: 100, height: 30 },
   { type: "country", label: "Country", icon: Globe, width: 150, height: 30 },
 ];
 
@@ -111,6 +119,11 @@ export default function TemplateEditorPage() {
   const [selectedFieldType, setSelectedFieldType] = useState("signature");
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
   const [numRecipientSlots, setNumRecipientSlots] = useState(1);
+
+  // Custom field state
+  const [customFields, setCustomFields] = useState<Array<{ type: string; label: string }>>([]);
+  const [showCustomFieldDialog, setShowCustomFieldDialog] = useState(false);
+  const [newCustomFieldLabel, setNewCustomFieldLabel] = useState("");
 
   // PDF state
   const [numPages, setNumPages] = useState(0);
@@ -178,23 +191,28 @@ export default function TemplateEditorPage() {
       if (!pageContainerRef.current) return;
 
       const rect = pageContainerRef.current.getBoundingClientRect();
-      const fieldType = fieldTypes.find(f => f.type === selectedFieldType);
-      if (!fieldType) return;
+      const standardFieldType = fieldTypes.find(f => f.type === selectedFieldType);
+      const customField = customFields.find(f => f.type === selectedFieldType);
+      if (!standardFieldType && !customField) return;
 
       const x = (e.clientX - rect.left) / scale;
       const y = (e.clientY - rect.top) / scale;
 
-      const xPosition = Math.max(0, x - fieldType.width / 2);
-      const yPosition = Math.max(0, y - fieldType.height / 2);
+      const width = standardFieldType?.width ?? 180;
+      const height = standardFieldType?.height ?? 30;
+
+      const xPosition = Math.max(0, x - width / 2);
+      const yPosition = Math.max(0, y - height / 2);
 
       addField(xPosition, yPosition);
     },
-    [selectedFieldType, scale, currentPage, selectedRecipientIndex]
+    [selectedFieldType, scale, currentPage, selectedRecipientIndex, customFields]
   );
 
   const addField = (x: number, y: number) => {
-    const fieldType = fieldTypes.find(f => f.type === selectedFieldType);
-    if (!fieldType) return;
+    const standardFieldType = fieldTypes.find(f => f.type === selectedFieldType);
+    const customField = customFields.find(f => f.type === selectedFieldType);
+    if (!standardFieldType && !customField) return;
 
     const newField: TemplateField = {
       id: `field-${Date.now()}`,
@@ -202,8 +220,8 @@ export default function TemplateEditorPage() {
       page: currentPage,
       xPosition: Math.round(x),
       yPosition: Math.round(y),
-      width: fieldType.width,
-      height: fieldType.height,
+      width: standardFieldType?.width ?? 180,
+      height: standardFieldType?.height ?? 30,
       required: true,
       recipientIndex: selectedRecipientIndex,
     };
@@ -211,6 +229,30 @@ export default function TemplateEditorPage() {
     setFields(prev => [...prev, newField]);
     setSelectedFieldId(newField.id);
     setHasChanges(true);
+  };
+
+  const addCustomField = () => {
+    const label = newCustomFieldLabel.trim();
+    if (!label) {
+      toast({ title: "Label required", description: "Please enter a label for your custom field.", variant: "destructive" });
+      return;
+    }
+    const existing = customFields.find(f => f.label.toLowerCase() === label.toLowerCase());
+    if (existing) {
+      toast({ title: "Field already exists", description: `A custom field named "${label}" already exists.`, variant: "destructive" });
+      return;
+    }
+    const newCustomField = { type: `custom:${label}`, label };
+    setCustomFields(prev => [...prev, newCustomField]);
+    setSelectedFieldType(newCustomField.type);
+    setNewCustomFieldLabel("");
+    setShowCustomFieldDialog(false);
+    toast({ title: "Custom field added", description: `"${label}" has been added.` });
+  };
+
+  const removeCustomField = (fieldType: string) => {
+    setCustomFields(prev => prev.filter(f => f.type !== fieldType));
+    if (selectedFieldType === fieldType) setSelectedFieldType("signature");
   };
 
   const updateFieldPosition = useCallback((id: string, x: number, y: number) => {
@@ -594,6 +636,45 @@ export default function TemplateEditorPage() {
                     );
                   })}
                 </div>
+
+                {/* Custom Fields */}
+                {customFields.length > 0 && (
+                  <div className="mt-3 space-y-1">
+                    {customFields.map((field) => (
+                      <div key={field.type} className="flex gap-1">
+                        <button
+                          onClick={() => setSelectedFieldType(field.type)}
+                          className={cn(
+                            "flex-1 flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors",
+                            selectedFieldType === field.type
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-muted hover:border-primary/50"
+                          )}
+                        >
+                          <FileText className="h-4 w-4 shrink-0" />
+                          <span className="truncate">{field.label}</span>
+                        </button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="shrink-0"
+                          onClick={() => removeCustomField(field.type)}
+                        >
+                          <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <Button
+                  variant="outline"
+                  className="w-full mt-3"
+                  onClick={() => setShowCustomFieldDialog(true)}
+                >
+                  <Settings2 className="mr-2 h-4 w-4" />
+                  Add Custom Field
+                </Button>
               </CardContent>
             </Card>
 
@@ -653,6 +734,38 @@ export default function TemplateEditorPage() {
           </div>
         </div>
       </div>
+
+      {/* Custom Field Dialog */}
+      <Dialog open={showCustomFieldDialog} onOpenChange={setShowCustomFieldDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Custom Field</DialogTitle>
+            <DialogDescription>
+              Create a custom text field with your own label. Signers will see this as a text input.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="custom-field-label">Field Label</Label>
+              <Input
+                id="custom-field-label"
+                placeholder="e.g. ABN, Tax File Number, Reference No."
+                value={newCustomFieldLabel}
+                onChange={(e) => setNewCustomFieldLabel(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); addCustomField(); }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowCustomFieldDialog(false); setNewCustomFieldLabel(""); }}>
+              Cancel
+            </Button>
+            <Button onClick={addCustomField}>Add Field</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -106,7 +106,7 @@ const fieldTypes = [
   { type: "firstname", label: "First Name", icon: User, width: 150, height: 30 },
   { type: "lastname", label: "Last Name", icon: User, width: 150, height: 30 },
   { type: "phone", label: "Phone", icon: Phone, width: 150, height: 30 },
-  { type: "abn", label: "ABN", icon: Hash, width: 150, height: 30 },
+
   { type: "address", label: "Street Address", icon: MapPin, width: 200, height: 30 },
   { type: "suburb", label: "Suburb / City", icon: MapPin, width: 150, height: 30 },
   { type: "state", label: "State", icon: Map, width: 100, height: 30 },
