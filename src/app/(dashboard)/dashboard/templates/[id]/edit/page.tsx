@@ -139,6 +139,10 @@ export default function TemplateEditorPage() {
   const [draggedField, setDraggedField] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
+  // Resize state
+  const [resizeMode, setResizeMode] = useState<"none" | "se" | "e" | "s">("none");
+  const [resizeStart, setResizeStart] = useState({ mouseX: 0, mouseY: 0, width: 0, height: 0 });
+
   const router = useRouter();
   const { toast } = useToast();
   const { data: session, status } = useSession();
@@ -281,6 +285,13 @@ export default function TemplateEditorPage() {
     setHasChanges(true);
   }, []);
 
+  const updateFieldSize = useCallback((id: string, width: number, height: number) => {
+    setFields(prev => prev.map(f =>
+      f.id === id ? { ...f, width: Math.round(Math.max(40, width)), height: Math.round(Math.max(20, height)) } : f
+    ));
+    setHasChanges(true);
+  }, []);
+
   const removeField = (id: string) => {
     setFields(prev => prev.filter(f => f.id !== id));
     if (selectedFieldId === id) {
@@ -349,27 +360,50 @@ export default function TemplateEditorPage() {
     if (!field) return;
 
     setDraggedField(fieldId);
+    setResizeMode("none");
     setSelectedFieldId(fieldId);
 
-    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     setDragOffset({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
     });
   };
 
+  const handleResizeMouseDown = (e: React.MouseEvent, fieldId: string, mode: "se" | "e" | "s") => {
+    e.stopPropagation();
+    e.preventDefault();
+    const field = fields.find(f => f.id === fieldId);
+    if (!field) return;
+
+    setDraggedField(fieldId);
+    setResizeMode(mode);
+    setSelectedFieldId(fieldId);
+    setResizeStart({ mouseX: e.clientX, mouseY: e.clientY, width: field.width, height: field.height });
+  };
+
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!draggedField || !pageContainerRef.current) return;
+
+    if (resizeMode !== "none") {
+      const dx = (e.clientX - resizeStart.mouseX) / scale;
+      const dy = (e.clientY - resizeStart.mouseY) / scale;
+      const newWidth = resizeMode !== "s" ? resizeStart.width + dx : resizeStart.width;
+      const newHeight = resizeMode !== "e" ? resizeStart.height + dy : resizeStart.height;
+      updateFieldSize(draggedField, newWidth, newHeight);
+      return;
+    }
 
     const rect = pageContainerRef.current.getBoundingClientRect();
     const x = (e.clientX - rect.left - dragOffset.x) / scale;
     const y = (e.clientY - rect.top - dragOffset.y) / scale;
 
     updateFieldPosition(draggedField, Math.max(0, x), Math.max(0, y));
-  }, [draggedField, dragOffset, scale, updateFieldPosition]);
+  }, [draggedField, dragOffset, scale, updateFieldPosition, resizeMode, resizeStart, updateFieldSize]);
 
   const handleMouseUp = useCallback(() => {
     setDraggedField(null);
+    setResizeMode("none");
   }, []);
 
   // Get fields for current page
@@ -539,7 +573,7 @@ export default function TemplateEditorPage() {
                             {fieldType?.label} (R{field.recipientIndex + 1})
                           </span>
                           <button
-                            className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 rounded-full p-0.5 transition-opacity"
                             onClick={(e) => {
                               e.stopPropagation();
                               removeField(field.id);
@@ -548,6 +582,23 @@ export default function TemplateEditorPage() {
                           >
                             <Trash2 className="h-3 w-3" />
                           </button>
+                          {/* Resize handles */}
+                          {selectedFieldId === field.id && (
+                            <>
+                              <div
+                                className="absolute top-1/2 -right-1.5 w-3 h-6 -translate-y-1/2 cursor-ew-resize bg-white border-2 border-gray-400 rounded-sm z-20"
+                                onMouseDown={(e) => handleResizeMouseDown(e, field.id, "e")}
+                              />
+                              <div
+                                className="absolute -bottom-1.5 left-1/2 h-3 w-6 -translate-x-1/2 cursor-ns-resize bg-white border-2 border-gray-400 rounded-sm z-20"
+                                onMouseDown={(e) => handleResizeMouseDown(e, field.id, "s")}
+                              />
+                              <div
+                                className="absolute -bottom-1.5 -right-1.5 h-4 w-4 cursor-nwse-resize bg-white border-2 border-gray-400 rounded-sm z-20"
+                                onMouseDown={(e) => handleResizeMouseDown(e, field.id, "se")}
+                              />
+                            </>
+                          )}
                         </div>
                       );
                     })}
