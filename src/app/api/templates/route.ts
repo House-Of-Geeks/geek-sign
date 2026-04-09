@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { templates, users } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { templates, users, teamMembers } from "@/lib/db/schema";
+import { eq, desc, or, inArray } from "drizzle-orm";
 import { put } from "@vercel/blob";
 import { plansConfig } from "@/config/plans";
 import type { Plan } from "@/types";
@@ -15,10 +15,23 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const memberships = await db
+      .select({ teamId: teamMembers.teamId })
+      .from(teamMembers)
+      .where(eq(teamMembers.userId, session.user.id));
+    const teamIds = memberships.map((m) => m.teamId);
+
     const userTemplates = await db
       .select()
       .from(templates)
-      .where(eq(templates.userId, session.user.id))
+      .where(
+        teamIds.length > 0
+          ? or(
+              eq(templates.userId, session.user.id),
+              inArray(templates.teamId, teamIds)
+            )
+          : eq(templates.userId, session.user.id)
+      )
       .orderBy(desc(templates.createdAt));
 
     return NextResponse.json(userTemplates);
@@ -106,10 +119,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const [membership] = await db
+      .select({ teamId: teamMembers.teamId })
+      .from(teamMembers)
+      .where(eq(teamMembers.userId, session.user.id))
+      .limit(1);
+
     const [newTemplate] = await db
       .insert(templates)
       .values({
         userId: session.user.id,
+        teamId: membership?.teamId ?? null,
         name,
         description: description || null,
         fileUrl,

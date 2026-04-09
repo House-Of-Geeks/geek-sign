@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
-import { db, documents, recipients, users } from "@/lib/db";
-import { eq, desc } from "drizzle-orm";
+import { db, documents, recipients, users, teamMembers } from "@/lib/db";
+import { eq, desc, or, inArray } from "drizzle-orm";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,11 +42,44 @@ export default async function DocumentsPage() {
   const retentionDays = plansConfig[effectivePlan].limits.retentionDays;
   const showRetentionWarning = retentionDays > 0 && !isSuperAdmin;
 
-  // Fetch documents with recipients
+  // Get team IDs the user belongs to
+  const memberships = await db
+    .select({ teamId: teamMembers.teamId })
+    .from(teamMembers)
+    .where(eq(teamMembers.userId, session.user.id));
+  const teamIds = memberships.map((m) => m.teamId);
+
+  // Fetch own documents + team documents, with owner info
   const userDocuments = await db
-    .select()
+    .select({
+      id: documents.id,
+      userId: documents.userId,
+      teamId: documents.teamId,
+      title: documents.title,
+      fileUrl: documents.fileUrl,
+      fileName: documents.fileName,
+      fileSize: documents.fileSize,
+      pageCount: documents.pageCount,
+      status: documents.status,
+      customMessage: documents.customMessage,
+      documentHash: documents.documentHash,
+      expiresAt: documents.expiresAt,
+      completedAt: documents.completedAt,
+      createdAt: documents.createdAt,
+      updatedAt: documents.updatedAt,
+      ownerName: users.name,
+      ownerEmail: users.email,
+    })
     .from(documents)
-    .where(eq(documents.userId, session.user.id))
+    .leftJoin(users, eq(documents.userId, users.id))
+    .where(
+      teamIds.length > 0
+        ? or(
+            eq(documents.userId, session.user.id),
+            inArray(documents.teamId, teamIds)
+          )
+        : eq(documents.userId, session.user.id)
+    )
     .orderBy(desc(documents.createdAt));
 
   // Fetch recipients for all documents
@@ -183,6 +216,11 @@ export default async function DocumentsPage() {
                       <p className="text-sm text-muted-foreground truncate">
                         {doc.fileName}
                       </p>
+                      {doc.userId !== session.user?.id && doc.ownerName && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          <span className="font-medium">Team</span> · {doc.ownerName}
+                        </p>
+                      )}
                     </div>
                   </div>
 
