@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { templates } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { templates, teamMembers } from "@/lib/db/schema";
+import { eq, and, or, inArray } from "drizzle-orm";
 import { put, del } from "@vercel/blob";
+
+async function getTeamIds(userId: string): Promise<string[]> {
+  const memberships = await db
+    .select({ teamId: teamMembers.teamId })
+    .from(teamMembers)
+    .where(eq(teamMembers.userId, userId));
+  return memberships.map((m) => m.teamId);
+}
 
 // GET single template
 export async function GET(
@@ -17,12 +25,18 @@ export async function GET(
     }
 
     const { id } = await params;
+    const teamIds = await getTeamIds(session.user.id);
 
     const [template] = await db
       .select()
       .from(templates)
       .where(
-        and(eq(templates.id, id), eq(templates.userId, session.user.id))
+        and(
+          eq(templates.id, id),
+          teamIds.length > 0
+            ? or(eq(templates.userId, session.user.id), inArray(templates.teamId, teamIds))
+            : eq(templates.userId, session.user.id)
+        )
       )
       .limit(1);
 
@@ -53,12 +67,18 @@ export async function PUT(
 
     const { id } = await params;
 
-    // Verify ownership
+    // Verify ownership or team membership
+    const teamIds = await getTeamIds(session.user.id);
     const [existingTemplate] = await db
       .select()
       .from(templates)
       .where(
-        and(eq(templates.id, id), eq(templates.userId, session.user.id))
+        and(
+          eq(templates.id, id),
+          teamIds.length > 0
+            ? or(eq(templates.userId, session.user.id), inArray(templates.teamId, teamIds))
+            : eq(templates.userId, session.user.id)
+        )
       )
       .limit(1);
 
