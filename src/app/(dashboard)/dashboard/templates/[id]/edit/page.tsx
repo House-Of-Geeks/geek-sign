@@ -823,6 +823,29 @@ export default function TemplateEditorPage() {
                         <div className="text-xs text-muted-foreground">
                           Page {field.page}, Position: ({Math.round(field.xPosition)}, {Math.round(field.yPosition)})
                         </div>
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium">Required</p>
+                          <div className="flex rounded-md overflow-hidden border text-xs">
+                            <button
+                              className={cn("flex-1 px-2 py-1.5 transition-colors", field.required ? "bg-primary text-primary-foreground" : "hover:bg-muted")}
+                              onClick={() => {
+                                setFields(prev => prev.map(f => f.id === selectedFieldId ? { ...f, required: true } : f));
+                                setHasChanges(true);
+                              }}
+                            >
+                              Required
+                            </button>
+                            <button
+                              className={cn("flex-1 px-2 py-1.5 transition-colors border-l", !field.required ? "bg-primary text-primary-foreground" : "hover:bg-muted")}
+                              onClick={() => {
+                                setFields(prev => prev.map(f => f.id === selectedFieldId ? { ...f, required: false } : f));
+                                setHasChanges(true);
+                              }}
+                            >
+                              Optional
+                            </button>
+                          </div>
+                        </div>
                         {(field.type === "date" || field.type === "date_auto") && (
                           <div className="space-y-1">
                             <p className="text-xs font-medium">Date mode</p>

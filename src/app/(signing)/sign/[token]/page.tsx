@@ -559,7 +559,7 @@ export default function SignPage({ params }: SignPageProps) {
                       <div className="flex-1">
                         <p className="text-sm font-medium">{fieldLabel}</p>
                         <p className="text-xs text-muted-foreground">
-                          {baseType === "date_auto" ? "Auto-filled" : field.value ? "Completed" : "Click to fill"}
+                          {baseType === "date_auto" ? "Auto-filled" : field.value ? "Completed" : !field.required ? "Optional" : "Click to fill"}
                         </p>
                       </div>
                       {field.value && (

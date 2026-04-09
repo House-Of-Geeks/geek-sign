@@ -1040,6 +1040,40 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
                               <p className="text-[10px] text-muted-foreground">Recipient can still edit this before signing</p>
                             </div>
                           )}
+                          {selectedFieldId === field.id && (
+                            <div className="flex rounded-md overflow-hidden border text-xs mx-1">
+                              <button
+                                className={`flex-1 px-2 py-1.5 transition-colors ${field.required ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                                onClick={() => {
+                                  setFields(prev => prev.map(f => f.id === field.id ? { ...f, required: true } : f));
+                                  if (!field.id.startsWith("temp-")) {
+                                    fetch(`/api/documents/${params.id}/fields/${field.id}`, {
+                                      method: "PATCH",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ required: true }),
+                                    }).catch(console.error);
+                                  }
+                                }}
+                              >
+                                Required
+                              </button>
+                              <button
+                                className={`flex-1 px-2 py-1.5 transition-colors border-l ${!field.required ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                                onClick={() => {
+                                  setFields(prev => prev.map(f => f.id === field.id ? { ...f, required: false } : f));
+                                  if (!field.id.startsWith("temp-")) {
+                                    fetch(`/api/documents/${params.id}/fields/${field.id}`, {
+                                      method: "PATCH",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ required: false }),
+                                    }).catch(console.error);
+                                  }
+                                }}
+                              >
+                                Optional
+                              </button>
+                            </div>
+                          )}
                           {selectedFieldId === field.id && (field.type === "date" || field.type === "date_auto") && (
                             <div className="flex rounded-md overflow-hidden border text-xs mx-1">
                               <button
