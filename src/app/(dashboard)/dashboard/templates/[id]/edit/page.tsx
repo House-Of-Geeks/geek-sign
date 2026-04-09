@@ -79,7 +79,6 @@ const fieldTypes = [
   { type: "signature", label: "Signature", icon: Pen, width: 200, height: 60 },
   { type: "initials", label: "Initials", icon: Type, width: 80, height: 40 },
   { type: "date", label: "Date", icon: Calendar, width: 120, height: 30 },
-  { type: "date_auto", label: "Signing Date", icon: Calendar, width: 120, height: 30 },
   { type: "checkbox", label: "Checkbox", icon: CheckSquare, width: 24, height: 24 },
   { type: "name", label: "Name", icon: User, width: 150, height: 30 },
   { type: "email", label: "Email", icon: Mail, width: 180, height: 30 },
@@ -814,11 +813,36 @@ export default function TemplateEditorPage() {
                       <>
                         <div className="flex items-center gap-2 text-sm">
                           <div className={cn("w-3 h-3 rounded-full", recipientColors[field.recipientIndex % recipientColors.length])} />
-                          <span>{fieldType?.label} - Recipient {field.recipientIndex + 1}</span>
+                          <span>{(field.type === "date" || field.type === "date_auto") ? "Date" : fieldType?.label} - Recipient {field.recipientIndex + 1}</span>
                         </div>
                         <div className="text-xs text-muted-foreground">
                           Page {field.page}, Position: ({Math.round(field.xPosition)}, {Math.round(field.yPosition)})
                         </div>
+                        {(field.type === "date" || field.type === "date_auto") && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium">Date mode</p>
+                            <div className="flex rounded-md overflow-hidden border text-xs">
+                              <button
+                                className={cn("flex-1 px-2 py-1.5 transition-colors", field.type === "date" ? "bg-primary text-primary-foreground" : "hover:bg-muted")}
+                                onClick={() => {
+                                  setFields(prev => prev.map(f => f.id === selectedFieldId ? { ...f, type: "date" } : f));
+                                  setHasChanges(true);
+                                }}
+                              >
+                                Signer enters
+                              </button>
+                              <button
+                                className={cn("flex-1 px-2 py-1.5 transition-colors border-l", field.type === "date_auto" ? "bg-primary text-primary-foreground" : "hover:bg-muted")}
+                                onClick={() => {
+                                  setFields(prev => prev.map(f => f.id === selectedFieldId ? { ...f, type: "date_auto" } : f));
+                                  setHasChanges(true);
+                                }}
+                              >
+                                Auto signing date
+                              </button>
+                            </div>
+                          </div>
+                        )}
                         <Button
                           variant="destructive"
                           size="sm"

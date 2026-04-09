@@ -98,7 +98,6 @@ const fieldTypes = [
   { type: "signature", label: "Signature", icon: Pen, width: 200, height: 60 },
   { type: "initials", label: "Initials", icon: Type, width: 80, height: 40 },
   { type: "date", label: "Date", icon: Calendar, width: 120, height: 30 },
-  { type: "date_auto", label: "Signing Date", icon: Calendar, width: 120, height: 30 },
   { type: "checkbox", label: "Checkbox", icon: CheckSquare, width: 24, height: 24 },
   { type: "name", label: "Name", icon: User, width: 150, height: 30 },
   { type: "email", label: "Email", icon: Mail, width: 180, height: 30 },
@@ -968,37 +967,74 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
                       const { baseType, label: fieldLabel } = getFieldTypeInfo(field.type);
                       const FieldIcon = fieldTypes.find(f => f.type === baseType)?.icon || (baseType === "custom" ? FileText : Type);
                       return (
-                        <div
-                          key={field.id}
-                          className={`flex items-center justify-between rounded-lg border p-2 cursor-pointer ${
-                            selectedFieldId === field.id ? "ring-2 ring-primary" : ""
-                          }`}
-                          onClick={() => {
-                            setSelectedFieldId(field.id);
-                            setCurrentPage(field.page);
-                          }}
-                        >
-                          <div className="flex items-center gap-2">
-                            <div className={`p-1 rounded ${colors.bg}`}>
-                              <FieldIcon className={`h-4 w-4 ${colors.text}`} />
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium">{fieldLabel}</p>
-                              <p className="text-xs text-muted-foreground">
-                                Page {field.page} • {recipient?.name || recipient?.email || "Unassigned"}
-                              </p>
-                            </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeField(field.id);
+                        <div key={field.id} className="space-y-1">
+                          <div
+                            className={`flex items-center justify-between rounded-lg border p-2 cursor-pointer ${
+                              selectedFieldId === field.id ? "ring-2 ring-primary" : ""
+                            }`}
+                            onClick={() => {
+                              setSelectedFieldId(field.id);
+                              setCurrentPage(field.page);
                             }}
                           >
-                            <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                          </Button>
+                            <div className="flex items-center gap-2">
+                              <div className={`p-1 rounded ${colors.bg}`}>
+                                <FieldIcon className={`h-4 w-4 ${colors.text}`} />
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium">
+                                  {field.type === "date" || field.type === "date_auto" ? "Date" : fieldLabel}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Page {field.page} • {recipient?.name || recipient?.email || "Unassigned"}
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeField(field.id);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                            </Button>
+                          </div>
+                          {selectedFieldId === field.id && (field.type === "date" || field.type === "date_auto") && (
+                            <div className="flex rounded-md overflow-hidden border text-xs mx-1">
+                              <button
+                                className={`flex-1 px-2 py-1.5 transition-colors ${field.type === "date" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                                onClick={() => {
+                                  setFields(prev => prev.map(f => f.id === field.id ? { ...f, type: "date" } : f));
+                                  if (!field.id.startsWith("temp-")) {
+                                    fetch(`/api/documents/${params.id}/fields/${field.id}`, {
+                                      method: "PATCH",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ type: "date" }),
+                                    }).catch(console.error);
+                                  }
+                                }}
+                              >
+                                Signer enters
+                              </button>
+                              <button
+                                className={`flex-1 px-2 py-1.5 transition-colors border-l ${field.type === "date_auto" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                                onClick={() => {
+                                  setFields(prev => prev.map(f => f.id === field.id ? { ...f, type: "date_auto" } : f));
+                                  if (!field.id.startsWith("temp-")) {
+                                    fetch(`/api/documents/${params.id}/fields/${field.id}`, {
+                                      method: "PATCH",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ type: "date_auto" }),
+                                    }).catch(console.error);
+                                  }
+                                }}
+                              >
+                                Auto signing date
+                              </button>
+                            </div>
+                          )}
                         </div>
                       );
                     })}
