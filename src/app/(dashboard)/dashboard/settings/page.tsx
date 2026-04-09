@@ -17,7 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Camera, Save, Palette, Lock, Sparkles } from "lucide-react";
+import { Loader2, Camera, Save, Palette, Lock, Sparkles, Pen, Trash2 } from "lucide-react";
 
 interface PlanLimits {
   plan: string;
@@ -32,6 +32,8 @@ interface UserProfile {
   companyName: string | null;
   brandingLogoUrl: string | null;
   brandingPrimaryColor: string | null;
+  savedSignature: string | null;
+  savedInitials: string | null;
 }
 
 export default function SettingsPage() {
@@ -42,6 +44,8 @@ export default function SettingsPage() {
   const [brandingPrimaryColor, setBrandingPrimaryColor] = useState("#000000");
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingBranding, setIsSavingBranding] = useState(false);
+  const [savedSignature, setSavedSignature] = useState<string | null>(null);
+  const [savedInitials, setSavedInitials] = useState<string | null>(null);
   const [planLimits, setPlanLimits] = useState<PlanLimits | null>(null);
   const { toast } = useToast();
 
@@ -70,6 +74,8 @@ export default function SettingsPage() {
           if (profile.companyName) setCompanyName(profile.companyName);
           if (profile.brandingLogoUrl) setBrandingLogoUrl(profile.brandingLogoUrl);
           if (profile.brandingPrimaryColor) setBrandingPrimaryColor(profile.brandingPrimaryColor);
+          setSavedSignature(profile.savedSignature ?? null);
+          setSavedInitials(profile.savedInitials ?? null);
         }
       } catch (error) {
         console.error("Error fetching data:", error);
@@ -363,6 +369,67 @@ export default function SettingsPage() {
                 </Link>
               </Button>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Saved Signature */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Pen className="h-5 w-5" />
+            Saved Signature
+          </CardTitle>
+          <CardDescription>
+            Your signature is saved automatically when you check "Save for next time" while signing a document.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {savedSignature || savedInitials ? (
+            <div className="space-y-4">
+              {savedSignature && (
+                <div className="space-y-1">
+                  <Label className="text-sm text-muted-foreground">Signature</Label>
+                  <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-3">
+                    <p className="text-2xl" style={{ fontFamily: "cursive" }}>{savedSignature}</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={async () => {
+                        await fetch("/api/user/profile", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ savedSignature: null }) });
+                        setSavedSignature(null);
+                        toast({ title: "Signature cleared" });
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {savedInitials && (
+                <div className="space-y-1">
+                  <Label className="text-sm text-muted-foreground">Initials</Label>
+                  <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-3">
+                    <p className="text-2xl" style={{ fontFamily: "cursive" }}>{savedInitials}</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={async () => {
+                        await fetch("/api/user/profile", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ savedInitials: null }) });
+                        setSavedInitials(null);
+                        toast({ title: "Initials cleared" });
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4 text-muted-foreground" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No saved signature yet. When you sign a document, check "Save for next time" to save it here.
+            </p>
           )}
         </CardContent>
       </Card>

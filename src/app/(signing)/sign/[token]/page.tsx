@@ -89,6 +89,9 @@ export default function SignPage({ params }: SignPageProps) {
   const [currentFieldIndex, setCurrentFieldIndex] = useState(0);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [signatureValue, setSignatureValue] = useState("");
+  const [savedSignature, setSavedSignature] = useState<string | null>(null);
+  const [savedInitials, setSavedInitials] = useState<string | null>(null);
+  const [saveSignatureChecked, setSaveSignatureChecked] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -137,6 +140,8 @@ export default function SignPage({ params }: SignPageProps) {
         setDocument(data.document);
         setRecipient(data.recipient);
         setFields(data.fields || []);
+        setSavedSignature(data.savedSignature ?? null);
+        setSavedInitials(data.savedInitials ?? null);
 
         // Check if consent was already given
         if (data.recipient.consentGiven) {
@@ -206,14 +211,14 @@ export default function SignPage({ params }: SignPageProps) {
       setShowSignatureModal(true);
     } else if (baseType === "date") {
       handleDateFieldClick(index);
-    } else if (baseType === "name" || baseType === "text" || baseType === "email" || baseType === "address" || baseType === "title" || baseType === "custom") {
-      // Open text field modal for text-based fields (including custom fields)
+    } else {
+      // Open text field modal for all other field types (name, email, address, company, phone, etc.)
       setTextFieldValue(field.value || "");
       setShowTextFieldModal(true);
     }
   };
 
-  const handleSignatureSubmit = () => {
+  const handleSignatureSubmit = async () => {
     if (!signatureValue.trim()) {
       toast({
         title: "Signature required",
@@ -223,6 +228,8 @@ export default function SignPage({ params }: SignPageProps) {
       return;
     }
 
+    const isInitials = fields[currentFieldIndex]?.type === "initials";
+
     const updatedFields = [...fields];
     updatedFields[currentFieldIndex] = {
       ...updatedFields[currentFieldIndex],
@@ -230,6 +237,22 @@ export default function SignPage({ params }: SignPageProps) {
     };
     setFields(updatedFields);
     setShowSignatureModal(false);
+
+    // Save signature for next time if checked
+    if (saveSignatureChecked) {
+      const body = isInitials
+        ? { initials: signatureValue }
+        : { signature: signatureValue };
+      await fetch(`/api/sign/${params.token}/save-signature`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (isInitials) setSavedInitials(signatureValue);
+      else setSavedSignature(signatureValue);
+    }
+
+    setSaveSignatureChecked(false);
     setSignatureValue("");
 
     // Move to next unsigned field
@@ -831,7 +854,7 @@ export default function SignPage({ params }: SignPageProps) {
       </Dialog>
 
       {/* Signature Modal */}
-      <Dialog open={showSignatureModal} onOpenChange={setShowSignatureModal}>
+      <Dialog open={showSignatureModal} onOpenChange={(open) => { setShowSignatureModal(open); if (!open) { setSignatureValue(""); setSaveSignatureChecked(false); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -844,6 +867,18 @@ export default function SignPage({ params }: SignPageProps) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Use saved signature button */}
+            {(fields[currentFieldIndex]?.type === "signature" ? savedSignature : savedInitials) && !signatureValue && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setSignatureValue(
+                  fields[currentFieldIndex]?.type === "signature" ? savedSignature! : savedInitials!
+                )}
+              >
+                Use saved {fields[currentFieldIndex]?.type === "signature" ? "signature" : "initials"}: <span className="ml-2 font-cursive italic">{fields[currentFieldIndex]?.type === "signature" ? savedSignature : savedInitials}</span>
+              </Button>
+            )}
             <div className="space-y-2">
               <Label htmlFor="signature">
                 {fields[currentFieldIndex]?.type === "signature"
@@ -871,11 +906,24 @@ export default function SignPage({ params }: SignPageProps) {
                 {signatureValue || "Your signature will appear here"}
               </p>
             </div>
+            {/* Save for next time */}
+            {signatureValue && (
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="save-signature"
+                  checked={saveSignatureChecked}
+                  onCheckedChange={(v) => setSaveSignatureChecked(!!v)}
+                />
+                <Label htmlFor="save-signature" className="text-sm cursor-pointer">
+                  Save for next time
+                </Label>
+              </div>
+            )}
           </div>
           <div className="flex gap-3">
             <Button
               variant="outline"
-              onClick={() => setShowSignatureModal(false)}
+              onClick={() => { setShowSignatureModal(false); setSignatureValue(""); setSaveSignatureChecked(false); }}
               className="flex-1"
             >
               Cancel

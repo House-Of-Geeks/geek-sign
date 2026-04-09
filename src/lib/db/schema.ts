@@ -27,6 +27,9 @@ export const users = pgTable("users", {
   // Custom branding (Starter+ plans)
   brandingLogoUrl: text("branding_logo_url"),
   brandingPrimaryColor: text("branding_primary_color"),
+  // Saved signature for quick re-use during signing
+  savedSignature: text("saved_signature"),
+  savedInitials: text("saved_initials"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

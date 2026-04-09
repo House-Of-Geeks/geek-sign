@@ -117,6 +117,13 @@ export async function GET(
       }
     }
 
+    // Check if recipient is a registered user with a saved signature
+    const [signingUser] = await db
+      .select({ savedSignature: users.savedSignature, savedInitials: users.savedInitials })
+      .from(users)
+      .where(eq(users.email, recipient.email))
+      .limit(1);
+
     return NextResponse.json({
       document: {
         id: document.id,
@@ -134,6 +141,8 @@ export async function GET(
         status: recipient.status,
         consentGiven: recipient.consentGiven || false,
       },
+      savedSignature: signingUser?.savedSignature ?? null,
+      savedInitials: signingUser?.savedInitials ?? null,
       fields: fields.map((f) => ({
         id: f.id,
         type: f.type,
