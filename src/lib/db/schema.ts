@@ -130,6 +130,7 @@ export const documents = pgTable("documents", {
   pageCount: integer("page_count"),
   status: text("status").default("draft").notNull(),
   customMessage: text("custom_message"),
+  senderDisplayName: text("sender_display_name"),
   // Document integrity - SHA-256 hash of original PDF
   documentHash: text("document_hash"),
   expiresAt: timestamp("expires_at"),

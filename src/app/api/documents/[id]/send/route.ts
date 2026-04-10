@@ -101,7 +101,7 @@ export async function POST(
     });
 
     // Send email invitations to all recipients
-    const senderName = senderNameOverride || user.sendAsName || user.name || user.email;
+    const senderName = senderNameOverride || document.senderDisplayName || user.sendAsName || user.name || user.email;
     const emailPromises = documentRecipients.map((recipient) => {
       const signUrl = `${APP_URL}/sign/${recipient.signingToken}`;
       return sendSignerInviteEmail({

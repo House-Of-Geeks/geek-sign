@@ -115,6 +115,7 @@ export default function TemplatesPage() {
   const [senderFieldValues, setSenderFieldValues] = useState<Record<string, string>>({});
   const [teamMembersList, setTeamMembersList] = useState<TeamMember[]>([]);
   const [selectedSenderUserId, setSelectedSenderUserId] = useState<string>("");
+  const [senderDisplayName, setSenderDisplayName] = useState<string>("");
   const [isCreatingDocument, setIsCreatingDocument] = useState(false);
 
   useEffect(() => {
@@ -224,6 +225,7 @@ export default function TemplatesPage() {
           customMessage: useTemplateData.customMessage || undefined,
           senderFieldValues: Object.keys(senderFieldValues).length > 0 ? senderFieldValues : undefined,
           senderUserId: selectedSenderUserId || undefined,
+          senderDisplayName: senderDisplayName.trim() || undefined,
         }),
       });
 
@@ -254,6 +256,7 @@ export default function TemplatesPage() {
       setUseTemplateId(null);
       setUseTemplateData({ title: "", customMessage: "" });
       setUseTemplateSlots([{ email: "", name: "" }]);
+      setSenderDisplayName("");
       setTemplateSenderFields([]);
       setSenderFieldValues({});
       setSelectedSenderUserId("");
@@ -488,9 +491,21 @@ export default function TemplatesPage() {
                 placeholder="Enter document title"
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="senderDisplayName">From name</Label>
+              <Input
+                id="senderDisplayName"
+                placeholder={session?.user?.name || "e.g. Why Solar"}
+                value={senderDisplayName}
+                onChange={(e) => setSenderDisplayName(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Signers will see &ldquo;<strong>{senderDisplayName || session?.user?.name || "Your Name"}</strong> requested your signature&rdquo;
+              </p>
+            </div>
             {teamMembersList.length > 0 && (
               <div className="space-y-2">
-                <Label htmlFor="sender">Sent by</Label>
+                <Label htmlFor="sender">Send as account</Label>
                 <select
                   id="sender"
                   className="w-full border rounded-md px-3 py-2 text-sm bg-background"

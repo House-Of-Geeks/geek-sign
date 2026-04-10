@@ -59,7 +59,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { title, recipientEmails, customMessage, senderFieldValues, senderUserId } = body;
+    const { title, recipientEmails, customMessage, senderFieldValues, senderUserId, senderDisplayName } = body;
 
     if (!title) {
       return NextResponse.json(
@@ -126,6 +126,7 @@ export async function POST(
         fileName,
         status: "draft",
         customMessage: customMessage || null,
+        senderDisplayName: senderDisplayName || null,
       })
       .returning();
 
