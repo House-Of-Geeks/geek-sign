@@ -70,6 +70,24 @@ export async function POST(
                       "unknown";
     const userAgent = request.headers.get("user-agent") || "unknown";
 
+    // Server-side validation: required fields must have values
+    const dbFields = await db
+      .select()
+      .from(documentFields)
+      .where(eq(documentFields.recipientId, recipient.id));
+
+    const fieldMap = new Map(fields.map((f) => [f.id, f.value]));
+    const missingRequired = dbFields.filter(
+      (f) => f.required && !f.type.startsWith("sender_") && f.type !== "date_auto" && !fieldMap.get(f.id)?.trim()
+    );
+
+    if (missingRequired.length > 0) {
+      return NextResponse.json(
+        { error: "All required fields must be completed before signing." },
+        { status: 400 }
+      );
+    }
+
     // Update all field values — including nulls to honour clears/skips
     for (const field of fields) {
       if (!field.id) continue;
