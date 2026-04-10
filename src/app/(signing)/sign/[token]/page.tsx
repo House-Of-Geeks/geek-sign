@@ -316,8 +316,14 @@ export default function SignPage({ params }: SignPageProps) {
       setTextFieldValue("");
       setShowDropdownModal(true);
     } else if (nextBaseType === "date") {
-      setTextFieldValue("");
-      handleDateFieldClick(nextIndex);
+      const todayISO = new Date().toISOString().split("T")[0];
+      const existing = updatedFields[nextIndex]?.value;
+      let isoVal = todayISO;
+      if (existing) {
+        const parsed = new Date(existing);
+        if (!isNaN(parsed.getTime())) isoVal = parsed.toISOString().split("T")[0];
+      }
+      setTextFieldValue(isoVal);
     } else {
       setTextFieldValue(updatedFields[nextIndex]?.value || "");
     }
@@ -325,8 +331,18 @@ export default function SignPage({ params }: SignPageProps) {
 
   const handleInlineNext = () => {
     const currentField = fields[currentFieldIndex];
-    if (!textFieldValue.trim() && currentField?.required !== false) {
-      const { label: fieldLabel } = getFieldTypeInfo(currentField?.type || "");
+    const { baseType, label: fieldLabel } = getFieldTypeInfo(currentField?.type || "");
+    let valueToSave = textFieldValue.trim();
+
+    // Convert ISO date to display format
+    if (baseType === "date" && valueToSave) {
+      const parsed = new Date(valueToSave + "T00:00:00");
+      if (!isNaN(parsed.getTime())) {
+        valueToSave = parsed.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+      }
+    }
+
+    if (!valueToSave && currentField?.required !== false) {
       toast({
         title: "Value required",
         description: `Please enter your ${fieldLabel.toLowerCase()}.`,
@@ -337,7 +353,7 @@ export default function SignPage({ params }: SignPageProps) {
     const updatedFields = [...fields];
     updatedFields[currentFieldIndex] = {
       ...updatedFields[currentFieldIndex],
-      value: textFieldValue.trim() || null,
+      value: valueToSave || null,
     };
     setFields(updatedFields);
     setTextFieldValue("");
@@ -359,11 +375,16 @@ export default function SignPage({ params }: SignPageProps) {
   const handleInlinePrev = () => {
     // Save current draft silently
     if (currentFieldIndex >= 0 && isInlineTextField(fields[currentFieldIndex])) {
+      const { baseType: curBaseType } = getFieldTypeInfo(fields[currentFieldIndex].type);
+      let valueToSave: string | null = textFieldValue.trim() || null;
+      if (curBaseType === "date" && valueToSave) {
+        const parsed = new Date(valueToSave + "T00:00:00");
+        if (!isNaN(parsed.getTime())) {
+          valueToSave = parsed.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+        }
+      }
       const updatedFields = [...fields];
-      updatedFields[currentFieldIndex] = {
-        ...updatedFields[currentFieldIndex],
-        value: textFieldValue.trim() || null,
-      };
+      updatedFields[currentFieldIndex] = { ...updatedFields[currentFieldIndex], value: valueToSave };
       setFields(updatedFields);
     }
     const prevItem = navigableFields[currentNavIdx - 1];
@@ -372,7 +393,13 @@ export default function SignPage({ params }: SignPageProps) {
     if (prevField.page !== currentPage) setCurrentPage(prevField.page);
     setCurrentFieldIndex(prevIndex);
     if (isInlineTextField(prevField)) {
-      setTextFieldValue(prevField.value || "");
+      const { baseType: prevBaseType } = getFieldTypeInfo(prevField.type);
+      if (prevBaseType === "date" && prevField.value) {
+        const parsed = new Date(prevField.value);
+        setTextFieldValue(!isNaN(parsed.getTime()) ? parsed.toISOString().split("T")[0] : new Date().toISOString().split("T")[0]);
+      } else {
+        setTextFieldValue(prevField.value || "");
+      }
     } else {
       setTextFieldValue("");
     }
@@ -423,15 +450,14 @@ export default function SignPage({ params }: SignPageProps) {
       setShowConsentModal(true);
       return;
     }
-
-    const today = new Date().toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-    const updatedFields = [...fields];
-    updatedFields[index] = { ...updatedFields[index], value: today };
-    setFields(updatedFields);
+    const todayISO = new Date().toISOString().split("T")[0];
+    const existing = fields[index]?.value;
+    let isoDefault = todayISO;
+    if (existing) {
+      const parsed = new Date(existing);
+      if (!isNaN(parsed.getTime())) isoDefault = parsed.toISOString().split("T")[0];
+    }
+    setTextFieldValue(isoDefault);
   };
 
   const handlePostcodesSubmit = () => {
@@ -1052,7 +1078,7 @@ export default function SignPage({ params }: SignPageProps) {
           {/* Inline Field Input Bar */}
           {currentFieldIndex >= 0 && isInlineTextField(fields[currentFieldIndex]) && (() => {
             const currentField = fields[currentFieldIndex];
-            const { label: fieldLabel } = getFieldTypeInfo(currentField.type);
+            const { baseType, label: fieldLabel } = getFieldTypeInfo(currentField.type);
             const isLast = currentNavIdx === navigableFields.length - 1;
             const isFirst = currentNavIdx === 0;
             return (
@@ -1078,7 +1104,15 @@ export default function SignPage({ params }: SignPageProps) {
                           {currentNavIdx + 1} of {navigableFields.length}
                         </span>
                       </div>
-                      {currentField.type === "paragraph" ? (
+                      {baseType === "date" ? (
+                        <Input
+                          ref={inlineInputRef}
+                          type="date"
+                          value={textFieldValue}
+                          onChange={(e) => setTextFieldValue(e.target.value)}
+                          className="text-base"
+                        />
+                      ) : currentField.type === "paragraph" ? (
                         <Textarea
                           ref={inlineInputRef}
                           placeholder={`Enter ${fieldLabel.toLowerCase()}...`}
