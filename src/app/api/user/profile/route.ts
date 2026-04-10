@@ -12,6 +12,7 @@ const updateProfileSchema = z.object({
   brandingPrimaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
   savedSignature: z.string().max(200).optional().nullable(),
   savedInitials: z.string().max(20).optional().nullable(),
+  sendAsName: z.string().max(100).optional().nullable(),
 });
 
 export async function GET() {
@@ -34,6 +35,7 @@ export async function GET() {
         brandingPrimaryColor: users.brandingPrimaryColor,
         savedSignature: users.savedSignature,
         savedInitials: users.savedInitials,
+        sendAsName: users.sendAsName,
         createdAt: users.createdAt,
       })
       .from(users)
@@ -72,7 +74,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const { name, companyName, brandingLogoUrl, brandingPrimaryColor, savedSignature, savedInitials } = parsed.data;
+    const { name, companyName, brandingLogoUrl, brandingPrimaryColor, savedSignature, savedInitials, sendAsName } = parsed.data;
 
     // Build update object with only provided fields
     const updateData: {
@@ -82,6 +84,7 @@ export async function PATCH(request: NextRequest) {
       brandingPrimaryColor?: string | null;
       savedSignature?: string | null;
       savedInitials?: string | null;
+      sendAsName?: string | null;
     } = {};
     if (name !== undefined) updateData.name = name;
     if (companyName !== undefined) updateData.companyName = companyName;
@@ -89,6 +92,7 @@ export async function PATCH(request: NextRequest) {
     if (brandingPrimaryColor !== undefined) updateData.brandingPrimaryColor = brandingPrimaryColor;
     if (savedSignature !== undefined) updateData.savedSignature = savedSignature;
     if (savedInitials !== undefined) updateData.savedInitials = savedInitials;
+    if (sendAsName !== undefined) updateData.sendAsName = sendAsName;
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(

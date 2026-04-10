@@ -30,6 +30,8 @@ export const users = pgTable("users", {
   // Saved signature for quick re-use during signing
   savedSignature: text("saved_signature"),
   savedInitials: text("saved_initials"),
+  // Custom sender display name for outgoing signature request emails
+  sendAsName: text("send_as_name"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

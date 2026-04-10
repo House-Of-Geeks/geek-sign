@@ -34,12 +34,14 @@ interface UserProfile {
   brandingPrimaryColor: string | null;
   savedSignature: string | null;
   savedInitials: string | null;
+  sendAsName: string | null;
 }
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
   const [fullName, setFullName] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [sendAsName, setSendAsName] = useState("");
   const [brandingLogoUrl, setBrandingLogoUrl] = useState("");
   const [brandingPrimaryColor, setBrandingPrimaryColor] = useState("#000000");
   const [isSaving, setIsSaving] = useState(false);
@@ -72,6 +74,7 @@ export default function SettingsPage() {
         if (profileRes.ok) {
           const profile: UserProfile = await profileRes.json();
           if (profile.companyName) setCompanyName(profile.companyName);
+          if (profile.sendAsName) setSendAsName(profile.sendAsName);
           if (profile.brandingLogoUrl) setBrandingLogoUrl(profile.brandingLogoUrl);
           if (profile.brandingPrimaryColor) setBrandingPrimaryColor(profile.brandingPrimaryColor);
           setSavedSignature(profile.savedSignature ?? null);
@@ -96,7 +99,7 @@ export default function SettingsPage() {
       const response = await fetch("/api/user/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: fullName, companyName }),
+        body: JSON.stringify({ name: fullName, companyName, sendAsName: sendAsName || null }),
       });
 
       if (!response.ok) throw new Error("Failed to update profile");
@@ -224,6 +227,18 @@ export default function SettingsPage() {
                 onChange={(e) => setCompanyName(e.target.value)}
                 placeholder="Enter your company name"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="sendAsName">Send As Name</Label>
+              <Input
+                id="sendAsName"
+                value={sendAsName}
+                onChange={(e) => setSendAsName(e.target.value)}
+                placeholder={fullName || "e.g. Andy Smith"}
+              />
+              <p className="text-xs text-muted-foreground">
+                This name appears on signature request emails — e.g. &ldquo;Andy Smith requested your signature&rdquo;. Leave blank to use your full name.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
