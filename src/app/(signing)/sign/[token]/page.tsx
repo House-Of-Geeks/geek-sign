@@ -607,11 +607,11 @@ export default function SignPage({ params }: SignPageProps) {
 
   // Auto-save progress whenever field values change
   useEffect(() => {
-    const filledFields = fields.filter((f) => f.value && !f.type.startsWith("sender_"));
-    if (filledFields.length === 0) return;
+    const signerFields = fields.filter((f) => !f.type.startsWith("sender_") && f.type !== "date_auto");
+    if (signerFields.length === 0) return;
 
     // 1. Save immediately to localStorage (survives quick refreshes)
-    const progress = filledFields.reduce<Record<string, string>>((acc, f) => {
+    const progress = signerFields.reduce<Record<string, string>>((acc, f) => {
       if (f.id && f.value) acc[f.id] = f.value;
       return acc;
     }, {});
@@ -619,13 +619,13 @@ export default function SignPage({ params }: SignPageProps) {
       localStorage.setItem(`sign-progress-${params.token}`, JSON.stringify(progress));
     } catch {}
 
-    // 2. Debounce server save (survives cross-device / incognito)
+    // 2. Debounce server save — send all signer fields including nulls to honour clears
     const timer = setTimeout(() => {
       fetch(`/api/sign/${params.token}/progress`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fields: filledFields.map((f) => ({ id: f.id, value: f.value })),
+          fields: signerFields.map((f) => ({ id: f.id, value: f.value ?? null })),
         }),
       }).catch(() => {});
     }, 1000);

@@ -13,7 +13,7 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://sign.houseofgeeks.on
 
 interface FieldUpdate {
   id: string;
-  value: string;
+  value: string | null;
 }
 
 export async function POST(
@@ -70,19 +70,18 @@ export async function POST(
                       "unknown";
     const userAgent = request.headers.get("user-agent") || "unknown";
 
-    // Update field values
+    // Update all field values — including nulls to honour clears/skips
     for (const field of fields) {
-      if (field.value) {
-        await db
-          .update(documentFields)
-          .set({ value: field.value })
-          .where(
-            and(
-              eq(documentFields.id, field.id),
-              eq(documentFields.recipientId, recipient.id)
-            )
-          );
-      }
+      if (!field.id) continue;
+      await db
+        .update(documentFields)
+        .set({ value: field.value ?? null })
+        .where(
+          and(
+            eq(documentFields.id, field.id),
+            eq(documentFields.recipientId, recipient.id)
+          )
+        );
     }
 
     // Update recipient status
