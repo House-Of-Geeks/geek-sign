@@ -59,7 +59,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { title, recipientEmails, customMessage, senderFieldValues } = body;
+    const { title, recipientEmails, customMessage, senderFieldValues, senderUserId } = body;
 
     if (!title) {
       return NextResponse.json(
@@ -98,11 +98,29 @@ export async function POST(
       );
     }
 
+    // Validate senderUserId is a team member if provided
+    let documentUserId = session.user.id;
+    if (senderUserId && senderUserId !== session.user.id) {
+      const senderMembership = await db
+        .select({ userId: teamMembers.userId })
+        .from(teamMembers)
+        .where(
+          and(
+            eq(teamMembers.userId, senderUserId),
+            inArray(teamMembers.teamId, teamIds)
+          )
+        )
+        .limit(1);
+      if (senderMembership.length > 0) {
+        documentUserId = senderUserId;
+      }
+    }
+
     // Create the document
     const [newDocument] = await db
       .insert(documents)
       .values({
-        userId: session.user.id,
+        userId: documentUserId,
         title,
         fileUrl: fileUrl!,
         fileName,

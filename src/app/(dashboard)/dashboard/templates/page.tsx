@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import {
   Card,
@@ -89,9 +90,16 @@ interface PlanLimits {
   };
 }
 
+interface TeamMember {
+  userId: string;
+  role: string;
+  user: { name: string | null; email: string };
+}
+
 export default function TemplatesPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { data: session } = useSession();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [planLimits, setPlanLimits] = useState<PlanLimits | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -105,11 +113,17 @@ export default function TemplatesPage() {
   const [useTemplateSlots, setUseTemplateSlots] = useState<Array<{ email: string; name: string }>>([{ email: "", name: "" }]);
   const [templateSenderFields, setTemplateSenderFields] = useState<TemplateFieldInfo[]>([]);
   const [senderFieldValues, setSenderFieldValues] = useState<Record<string, string>>({});
+  const [teamMembersList, setTeamMembersList] = useState<TeamMember[]>([]);
+  const [selectedSenderUserId, setSelectedSenderUserId] = useState<string>("");
   const [isCreatingDocument, setIsCreatingDocument] = useState(false);
 
   useEffect(() => {
     fetchTemplates();
     fetchPlanLimits();
+    fetch("/api/team/members")
+      .then((r) => r.ok ? r.json() : { members: [] })
+      .then((data) => setTeamMembersList(data.members || []))
+      .catch(() => {});
   }, []);
 
   const fetchTemplates = async () => {
@@ -209,6 +223,7 @@ export default function TemplatesPage() {
           recipientEmails,
           customMessage: useTemplateData.customMessage || undefined,
           senderFieldValues: Object.keys(senderFieldValues).length > 0 ? senderFieldValues : undefined,
+          senderUserId: selectedSenderUserId || undefined,
         }),
       });
 
@@ -241,6 +256,7 @@ export default function TemplatesPage() {
       setUseTemplateSlots([{ email: "", name: "" }]);
       setTemplateSenderFields([]);
       setSenderFieldValues({});
+      setSelectedSenderUserId("");
     }
   };
 
@@ -472,6 +488,26 @@ export default function TemplatesPage() {
                 placeholder="Enter document title"
               />
             </div>
+            {teamMembersList.length > 0 && (
+              <div className="space-y-2">
+                <Label htmlFor="sender">Sent by</Label>
+                <select
+                  id="sender"
+                  className="w-full border rounded-md px-3 py-2 text-sm bg-background"
+                  value={selectedSenderUserId}
+                  onChange={(e) => setSelectedSenderUserId(e.target.value)}
+                >
+                  <option value="">Me ({session?.user?.name || session?.user?.email})</option>
+                  {teamMembersList
+                    .filter((m) => m.userId !== session?.user?.id)
+                    .map((m) => (
+                      <option key={m.userId} value={m.userId}>
+                        {m.user.name ? `${m.user.name} (${m.user.email})` : m.user.email}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
             <div className="space-y-3">
               {useTemplateSlots.map((slot, index) => (
                 <div key={index} className="space-y-1">
