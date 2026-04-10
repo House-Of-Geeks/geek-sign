@@ -125,6 +125,7 @@ export default function SignPage({ params }: SignPageProps) {
   const [pageSize, setPageSize] = useState({ width: 612, height: 792 });
   const pageContainerRef = useRef<HTMLDivElement>(null);
   const pdfScrollRef = useRef<HTMLDivElement>(null);
+  const inlineInputRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
 
   const { toast } = useToast();
 
@@ -562,6 +563,13 @@ export default function SignPage({ params }: SignPageProps) {
     }, 50);
     return () => clearTimeout(timer);
   }, [currentFieldIndex, currentPage]);
+
+  // Focus inline input whenever the active field changes to a text-type field
+  useEffect(() => {
+    if (currentFieldIndex < 0 || !isInlineTextField(fields[currentFieldIndex])) return;
+    const timer = setTimeout(() => inlineInputRef.current?.focus(), 80);
+    return () => clearTimeout(timer);
+  }, [currentFieldIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Get fields for current page
   const currentPageFields = fields.filter(f => f.page === currentPage);
@@ -1028,21 +1036,21 @@ export default function SignPage({ params }: SignPageProps) {
                       </div>
                       {currentField.type === "paragraph" ? (
                         <Textarea
+                          ref={inlineInputRef}
                           placeholder={`Enter ${fieldLabel.toLowerCase()}...`}
                           value={textFieldValue}
                           onChange={(e) => setTextFieldValue(e.target.value)}
                           className="min-h-[80px]"
-                          autoFocus
                         />
                       ) : (
                         <Input
+                          ref={inlineInputRef}
                           type={currentField.type === "number" ? "number" : "text"}
                           placeholder={`Enter your ${fieldLabel.toLowerCase()}`}
                           value={textFieldValue}
                           onChange={(e) => setTextFieldValue(e.target.value)}
                           onKeyDown={(e) => { if (e.key === "Enter") handleInlineNext(); }}
                           className="text-base"
-                          autoFocus
                         />
                       )}
                     </div>
