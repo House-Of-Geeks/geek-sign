@@ -677,6 +677,34 @@ export default function SignPage({ params }: SignPageProps) {
       <div className="grid gap-8 lg:grid-cols-4">
         {/* Sidebar */}
         <div className="lg:col-span-1 space-y-6">
+          {/* All fields complete — prominent CTA */}
+          {allFieldsComplete && hasConsented && (
+            <div className="rounded-xl border-2 border-green-400 bg-green-50 p-4 shadow-md">
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                <p className="text-sm font-semibold text-green-800">All required fields complete!</p>
+              </div>
+              <Button
+                onClick={handleComplete}
+                disabled={isSigning}
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
+                size="lg"
+              >
+                {isSigning ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Complete Signing
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Document</CardTitle>
