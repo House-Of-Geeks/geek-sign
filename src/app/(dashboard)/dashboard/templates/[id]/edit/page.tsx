@@ -1059,7 +1059,7 @@ export default function TemplateEditorPage() {
                   <li>4. Drag fields to reposition them</li>
                   <li>5. Click Save when done</li>
                   <li className="border-t pt-2 text-amber-700">
-                    <strong>Sender Fill:</strong> Use the amber "Sender Fill" slot for fields the sender fills in before sending. Great for terms, pricing, or custom clauses.
+                    <strong>Sender Fill:</strong> Use the amber &ldquo;Sender Fill&rdquo; slot for fields the sender fills in before sending. Great for terms, pricing, or custom clauses.
                   </li>
                 </ul>
               </CardContent>
