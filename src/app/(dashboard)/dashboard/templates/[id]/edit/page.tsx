@@ -908,6 +908,96 @@ export default function TemplateEditorPage() {
               </CardContent>
             </Card>
 
+            {/* All Fields List */}
+            {fields.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">
+                    All Fields
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">({fields.length})</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="max-h-64 overflow-y-auto">
+                    {(() => {
+                      // Group by recipient
+                      const senderFields = fields.filter(f => f.recipientIndex === SENDER_FILL_INDEX);
+                      const recipientGroups: Record<number, TemplateField[]> = {};
+                      fields.filter(f => f.recipientIndex !== SENDER_FILL_INDEX).forEach(f => {
+                        if (!recipientGroups[f.recipientIndex]) recipientGroups[f.recipientIndex] = [];
+                        recipientGroups[f.recipientIndex].push(f);
+                      });
+
+                      const getFieldLabel = (field: TemplateField) => {
+                        if (field.type.startsWith("custom:")) return field.type.replace("custom:", "");
+                        if (field.type.startsWith("dropdown:")) {
+                          const parts = field.type.split(":");
+                          return parts[1] || "Dropdown";
+                        }
+                        if (field.type === "date_auto") return "Date (auto)";
+                        return fieldTypes.find(ft => ft.type === field.type)?.label || field.type;
+                      };
+
+                      const groupColors: [string, string][] = [
+                        ["text-blue-600", "bg-blue-500"],
+                        ["text-green-600", "bg-green-500"],
+                        ["text-purple-600", "bg-purple-500"],
+                        ["text-orange-600", "bg-orange-500"],
+                        ["text-pink-600", "bg-pink-500"],
+                        ["text-cyan-600", "bg-cyan-500"],
+                      ];
+
+                      const renderGroup = (groupFields: TemplateField[], label: string, textClass: string, dotClass: string) => (
+                        <div key={label}>
+                          <div className={cn("px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5 sticky top-0 bg-muted/80 backdrop-blur-sm border-b", textClass)}>
+                            <div className={cn("w-2 h-2 rounded-full shrink-0", dotClass)} />
+                            {label}
+                          </div>
+                          {groupFields
+                            .slice()
+                            .sort((a, b) => a.page - b.page || a.yPosition - b.yPosition)
+                            .map(field => (
+                              <button
+                                key={field.id}
+                                className={cn(
+                                  "w-full flex items-center gap-2 px-3 py-2 text-left text-xs hover:bg-muted/60 transition-colors border-b last:border-b-0",
+                                  selectedFieldId === field.id && "bg-muted"
+                                )}
+                                onClick={() => {
+                                  setSelectedFieldId(field.id);
+                                  setCurrentPage(field.page);
+                                }}
+                              >
+                                <span className="flex-1 truncate font-medium">{getFieldLabel(field)}</span>
+                                <span className="text-muted-foreground shrink-0">p.{field.page}</span>
+                                <span className={cn(
+                                  "shrink-0 rounded px-1 py-0.5 text-[10px] leading-none",
+                                  field.required ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-500"
+                                )}>
+                                  {field.required ? "req" : "opt"}
+                                </span>
+                              </button>
+                            ))}
+                        </div>
+                      );
+
+                      return (
+                        <>
+                          {Object.entries(recipientGroups)
+                            .sort(([a], [b]) => Number(a) - Number(b))
+                            .map(([index, groupFields]) => {
+                              const [textClass, dotClass] = groupColors[Number(index) % groupColors.length];
+                              return renderGroup(groupFields, `Recipient ${Number(index) + 1}`, textClass, dotClass);
+                            })}
+                          {senderFields.length > 0 && renderGroup(senderFields, "Sender Fill", "text-amber-600", "bg-amber-500")}
+                        </>
+                      );
+                    })()}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Selected Field Info */}
             {selectedFieldId && (
               <Card>
