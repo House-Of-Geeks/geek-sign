@@ -224,7 +224,7 @@ export default function SignPage({ params }: SignPageProps) {
     }
   };
 
-  const handleFieldClick = (index: number) => {
+  const handleFieldClick = (index: number, fromPDF = false) => {
     if (!hasConsented) {
       setShowConsentModal(true);
       return;
@@ -247,13 +247,15 @@ export default function SignPage({ params }: SignPageProps) {
     if (baseType === "signature" || baseType === "initials") {
       setShowSignatureModal(true);
     } else if (baseType === "checkbox") {
-      // Toggle checkbox immediately — no modal needed
-      const updatedFields = [...fields];
-      updatedFields[index] = {
-        ...updatedFields[index],
-        value: updatedFields[index].value === "checked" ? "" : "checked",
-      };
-      setFields(updatedFields);
+      // Only toggle when clicking on the PDF — sidebar click just navigates to it
+      if (fromPDF) {
+        const updatedFields = [...fields];
+        updatedFields[index] = {
+          ...updatedFields[index],
+          value: updatedFields[index].value === "checked" ? "" : "checked",
+        };
+        setFields(updatedFields);
+      }
     } else if (baseType === "date_auto") {
       // Auto-filled — nothing for signer to do
       return;
@@ -995,7 +997,7 @@ export default function SignPage({ params }: SignPageProps) {
                           return (
                             <button
                               key={field.id}
-                              onClick={() => handleFieldClick(globalIndex)}
+                              onClick={() => handleFieldClick(globalIndex, true)}
                               disabled={!hasConsented}
                               className={cn(
                                 "absolute rounded transition-all flex items-center justify-center border-2",
@@ -1027,7 +1029,7 @@ export default function SignPage({ params }: SignPageProps) {
                         return (
                           <button
                             key={field.id}
-                            onClick={() => handleFieldClick(globalIndex)}
+                            onClick={() => handleFieldClick(globalIndex, true)}
                             disabled={!hasConsented}
                             className={cn(
                               "absolute border-2 rounded transition-all flex items-center justify-center",
