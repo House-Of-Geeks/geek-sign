@@ -935,7 +935,7 @@ export default function SignPage({ params }: SignPageProps) {
                                 "absolute rounded transition-all flex items-center justify-center border-2",
                                 !hasConsented && "opacity-50 cursor-not-allowed",
                                 hasConsented && "cursor-pointer",
-                                globalIndex === currentFieldIndex && "ring-2 ring-primary ring-offset-1 shadow-lg animate-pulse",
+                                globalIndex === currentFieldIndex && "border-orange-500 ring-2 ring-orange-400 ring-offset-1 shadow-lg animate-pulse",
                                 field.value === "checked"
                                   ? "border-green-500 bg-green-100"
                                   : "border-primary bg-white hover:bg-primary/10"
@@ -968,7 +968,7 @@ export default function SignPage({ params }: SignPageProps) {
                               !hasConsented && "opacity-50 cursor-not-allowed",
                               hasConsented && "cursor-pointer",
                               isActive
-                                ? "border-primary bg-primary/20 ring-2 ring-primary ring-offset-1 shadow-lg animate-pulse"
+                                ? "border-orange-500 bg-orange-100 ring-2 ring-orange-400 ring-offset-1 shadow-lg animate-pulse"
                                 : field.value
                                 ? "border-green-500 bg-green-50/90"
                                 : "border-primary bg-primary/10 hover:bg-primary/20"
