@@ -152,9 +152,19 @@ export default function SignPage({ params }: SignPageProps) {
         setRecipient(data.recipient);
         // Auto-fill date_auto fields with today's date
         const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-        setFields((data.fields || []).map((f: { type: string; value?: string | null }) =>
-          f.type === "date_auto" ? { ...f, value: today } : f
-        ));
+
+        // Restore any locally saved progress (fallback for quick refreshes)
+        let localProgress: Record<string, string> = {};
+        try {
+          const saved = localStorage.getItem(`sign-progress-${params.token}`);
+          if (saved) localProgress = JSON.parse(saved);
+        } catch {}
+
+        setFields((data.fields || []).map((f: { id: string; type: string; value?: string | null }) => {
+          if (f.type === "date_auto") return { ...f, value: today };
+          // Server value takes priority; fall back to localStorage
+          return { ...f, value: f.value || localProgress[f.id] || null };
+        }));
         setSavedSignature(data.savedSignature ?? null);
         setSavedInitials(data.savedInitials ?? null);
 
@@ -457,11 +467,21 @@ export default function SignPage({ params }: SignPageProps) {
     setPageSize({ width: page.width, height: page.height });
   };
 
-  // Auto-save progress to the server whenever field values change
+  // Auto-save progress whenever field values change
   useEffect(() => {
     const filledFields = fields.filter((f) => f.value && !f.type.startsWith("sender_"));
     if (filledFields.length === 0) return;
 
+    // 1. Save immediately to localStorage (survives quick refreshes)
+    const progress = filledFields.reduce<Record<string, string>>((acc, f) => {
+      if (f.id && f.value) acc[f.id] = f.value;
+      return acc;
+    }, {});
+    try {
+      localStorage.setItem(`sign-progress-${params.token}`, JSON.stringify(progress));
+    } catch {}
+
+    // 2. Debounce server save (survives cross-device / incognito)
     const timer = setTimeout(() => {
       fetch(`/api/sign/${params.token}/progress`, {
         method: "PATCH",
@@ -469,8 +489,8 @@ export default function SignPage({ params }: SignPageProps) {
         body: JSON.stringify({
           fields: filledFields.map((f) => ({ id: f.id, value: f.value })),
         }),
-      }).catch(() => {}); // silent — don't interrupt signing on save failure
-    }, 1500);
+      }).catch(() => {});
+    }, 1000);
 
     return () => clearTimeout(timer);
   }, [fields]);
