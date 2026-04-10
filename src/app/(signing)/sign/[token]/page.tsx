@@ -228,6 +228,14 @@ export default function SignPage({ params }: SignPageProps) {
 
     if (baseType === "signature" || baseType === "initials") {
       setShowSignatureModal(true);
+    } else if (baseType === "checkbox") {
+      // Toggle checkbox immediately — no modal needed
+      const updatedFields = [...fields];
+      updatedFields[index] = {
+        ...updatedFields[index],
+        value: updatedFields[index].value === "checked" ? "" : "checked",
+      };
+      setFields(updatedFields);
     } else if (baseType === "date_auto") {
       // Auto-filled — nothing for signer to do
       return;
@@ -385,9 +393,12 @@ export default function SignPage({ params }: SignPageProps) {
     if (nextUnsigned !== -1) setCurrentFieldIndex(nextUnsigned);
   };
 
-  const allFieldsComplete = fields.every(
-    (f) => !f.required || (f.value && f.value.trim() !== "")
-  );
+  const allFieldsComplete = fields.every((f) => {
+    if (!f.required) return true;
+    const { baseType } = getFieldTypeInfo(f.type);
+    if (baseType === "checkbox") return f.value === "checked";
+    return f.value && f.value.trim() !== "";
+  });
 
   const handleComplete = async () => {
     if (!hasConsented) {
@@ -635,10 +646,17 @@ export default function SignPage({ params }: SignPageProps) {
                       {baseType === "initials" && <Type className="h-4 w-4" />}
                       {(baseType === "date" || baseType === "date_auto") && <Calendar className="h-4 w-4" />}
                       {(baseType === "text" || baseType === "name" || baseType === "email" || baseType === "address" || baseType === "title" || baseType === "custom") && <Type className="h-4 w-4" />}
+                      {baseType === "checkbox" && (
+                        <div className={cn("h-4 w-4 rounded border-2 flex items-center justify-center shrink-0", field.value === "checked" ? "border-green-500 bg-green-100" : "border-muted-foreground")}>
+                          {field.value === "checked" && <CheckCircle2 className="h-3 w-3 text-green-600" />}
+                        </div>
+                      )}
                       <div className="flex-1">
                         <p className="text-sm font-medium">{fieldLabel}</p>
                         <p className="text-xs text-muted-foreground">
-                          {baseType === "date_auto" ? "Auto-filled" : field.value ? "Completed" : !field.required ? "Optional" : "Click to fill"}
+                          {baseType === "checkbox"
+                            ? field.value === "checked" ? "Checked" : !field.required ? "Optional — click to check" : "Click to check"
+                            : baseType === "date_auto" ? "Auto-filled" : field.value ? "Completed" : !field.required ? "Optional" : "Click to fill"}
                         </p>
                       </div>
                       {field.value && (
@@ -773,6 +791,37 @@ export default function SignPage({ params }: SignPageProps) {
                                 {field.value || ""}
                               </span>
                             </div>
+                          );
+                        }
+
+                        if (baseType === "checkbox") {
+                          return (
+                            <button
+                              key={field.id}
+                              onClick={() => handleFieldClick(globalIndex)}
+                              disabled={!hasConsented}
+                              className={cn(
+                                "absolute rounded transition-all flex items-center justify-center border-2",
+                                !hasConsented && "opacity-50 cursor-not-allowed",
+                                hasConsented && "cursor-pointer",
+                                field.value === "checked"
+                                  ? "border-green-500 bg-green-100"
+                                  : "border-primary bg-white hover:bg-primary/10"
+                              )}
+                              style={{
+                                left: field.xPosition * scale,
+                                top: field.yPosition * scale,
+                                width: field.width * scale,
+                                height: field.height * scale,
+                              }}
+                            >
+                              {field.value === "checked" && (
+                                <CheckCircle2
+                                  className="text-green-600"
+                                  style={{ width: field.width * scale * 0.7, height: field.height * scale * 0.7 }}
+                                />
+                              )}
+                            </button>
                           );
                         }
 
