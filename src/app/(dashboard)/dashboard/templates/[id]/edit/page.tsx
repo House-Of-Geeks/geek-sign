@@ -953,7 +953,13 @@ export default function TemplateEditorPage() {
                             <p className="text-xs text-muted-foreground">Describes what the sender should fill in before sending</p>
                           </div>
                         )}
-                        {field.recipientIndex !== SENDER_FILL_INDEX && !["signature", "initials", "date", "date_auto", "checkbox"].includes(field.type) && (
+                        {field.recipientIndex !== SENDER_FILL_INDEX && field.type === "postcodes" && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium">Field type</p>
+                            <div className="text-xs border rounded px-2 py-1.5 bg-muted text-muted-foreground">Postcodes (upload field)</div>
+                          </div>
+                        )}
+                        {field.recipientIndex !== SENDER_FILL_INDEX && !["signature", "initials", "date", "date_auto", "checkbox", "postcodes"].includes(field.type) && !field.type.startsWith("dropdown:") && !field.type.startsWith("custom:") && (
                           <div className="space-y-1">
                             <p className="text-xs font-medium">Field type</p>
                             <select

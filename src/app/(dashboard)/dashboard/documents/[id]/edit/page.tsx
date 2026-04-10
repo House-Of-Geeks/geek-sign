@@ -1097,7 +1097,13 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
                               <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
                             </Button>
                           </div>
-                          {selectedFieldId === field.id && !["signature", "initials", "date", "date_auto", "checkbox"].includes(field.type) && (
+                          {selectedFieldId === field.id && field.type === "postcodes" && (
+                            <div className="mx-1 mb-2">
+                              <p className="text-xs text-muted-foreground font-medium mb-1">Field type</p>
+                              <div className="text-xs border rounded px-2 py-1.5 bg-muted text-muted-foreground">Postcodes (upload field)</div>
+                            </div>
+                          )}
+                          {selectedFieldId === field.id && !["signature", "initials", "date", "date_auto", "checkbox", "postcodes"].includes(field.type) && !field.type.startsWith("dropdown:") && !field.type.startsWith("custom:") && (
                             <div className="mx-1">
                               <p className="text-xs text-muted-foreground font-medium mb-1">Field type</p>
                               <select
@@ -1133,7 +1139,7 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
                               </select>
                             </div>
                           )}
-                          {selectedFieldId === field.id && !["signature", "initials", "date", "date_auto", "checkbox"].includes(field.type) && (
+                          {selectedFieldId === field.id && !["signature", "initials", "date", "date_auto", "checkbox", "postcodes"].includes(field.type) && !field.type.startsWith("dropdown:") && !field.type.startsWith("custom:") && (
                             <div className="space-y-1 mx-1 pb-1">
                               <p className="text-xs text-muted-foreground font-medium">Pre-fill text (optional)</p>
                               <Textarea
