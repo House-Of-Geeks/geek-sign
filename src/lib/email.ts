@@ -494,6 +494,49 @@ export async function sendSenderDocumentCompletedEmail({
   });
 }
 
+interface SignerDocumentCompletedEmailProps {
+  signerName: string | null;
+  signerEmail: string;
+  documentTitle: string;
+  downloadUrl: string;
+}
+
+export async function sendSignerDocumentCompletedEmail({
+  signerName,
+  signerEmail,
+  documentTitle,
+  downloadUrl,
+}: SignerDocumentCompletedEmailProps): Promise<boolean> {
+  const content = `
+    <h2 style="margin: 0 0 16px 0; font-size: 20px; color: #111827;">
+      All signatures collected!
+    </h2>
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: #374151; line-height: 1.6;">
+      Hi${signerName ? ` ${signerName}` : ""},
+    </p>
+    <p style="margin: 0 0 16px 0; font-size: 15px; color: #374151; line-height: 1.6;">
+      Great news — all parties have now signed the document below. Your fully executed copy is ready to download.
+    </p>
+    <div style="background-color: #d1fae5; padding: 16px; border-radius: 6px; margin: 16px 0; border-left: 4px solid #10b981;">
+      <p style="margin: 0; font-size: 16px; color: #111827; font-weight: 600;">
+        ${documentTitle}
+      </p>
+      <p style="margin: 8px 0 0 0; font-size: 14px; color: #059669;">
+        ✓ Completed — all signatures collected
+      </p>
+    </div>
+    <div style="text-align: center;">
+      ${emailButton("Download Signed Document", downloadUrl, "#10b981")}
+    </div>
+  `;
+
+  return sendEmail({
+    to: signerEmail,
+    subject: `All signatures collected — "${documentTitle}" is ready`,
+    html: emailTemplate(content),
+  });
+}
+
 interface SenderDocumentDeclinedEmailProps {
   senderName: string;
   senderEmail: string;

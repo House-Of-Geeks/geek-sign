@@ -4,6 +4,7 @@ import { documents, recipients, documentFields, users, auditLogs } from "@/lib/d
 import { eq, and, ne } from "drizzle-orm";
 import {
   sendSignerCompletedEmail,
+  sendSignerDocumentCompletedEmail,
   sendSenderDocumentSignedEmail,
   sendSenderDocumentCompletedEmail,
 } from "@/lib/email";
@@ -161,6 +162,18 @@ export async function POST(
           documentTitle: document.title,
           documentUrl,
         });
+
+        // Notify all signers that the document is fully executed
+        await Promise.all(
+          allRecipients.map((r) =>
+            sendSignerDocumentCompletedEmail({
+              signerName: r.name,
+              signerEmail: r.email,
+              documentTitle: document.title,
+              downloadUrl: `${APP_URL}/api/sign/${r.signingToken}/download`,
+            })
+          )
+        );
       } else {
         // Notify sender that this recipient signed
         await sendSenderDocumentSignedEmail({
