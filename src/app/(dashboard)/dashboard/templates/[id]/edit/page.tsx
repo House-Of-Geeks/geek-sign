@@ -68,6 +68,8 @@ interface Template {
   fields: TemplateField[] | null;
 }
 
+const SENDER_FILL_INDEX = -1;
+
 interface TemplateField {
   id: string;
   type: string;
@@ -78,6 +80,7 @@ interface TemplateField {
   height: number;
   required: boolean;
   recipientIndex: number;
+  label?: string;
 }
 
 const fieldTypes = [
@@ -185,8 +188,9 @@ export default function TemplateEditorPage() {
         setTemplate(data);
         const templateFields = (data.fields || []) as TemplateField[];
         setFields(templateFields);
-        // Calculate number of recipient slots based on existing fields
-        const maxRecipientIndex = templateFields.reduce((max, f) => Math.max(max, f.recipientIndex || 0), 0);
+        // Calculate number of recipient slots based on existing fields (exclude sender-fill fields)
+        const recipientFields = templateFields.filter(f => f.recipientIndex !== SENDER_FILL_INDEX);
+        const maxRecipientIndex = recipientFields.reduce((max, f) => Math.max(max, f.recipientIndex ?? 0), 0);
         const numSlots = Math.max(1, maxRecipientIndex + 1);
         setNumRecipientSlots(numSlots);
         // Load pre-assigned recipients
@@ -593,7 +597,10 @@ export default function TemplateEditorPage() {
                     {currentPageFields.map((field) => {
                       const fieldType = fieldTypes.find(f => f.type === field.type);
                       const Icon = fieldType?.icon || Pen;
-                      const colorClass = recipientColors[field.recipientIndex % recipientColors.length];
+                      const isSenderFill = field.recipientIndex === SENDER_FILL_INDEX;
+                      const colorClass = isSenderFill
+                        ? "bg-amber-500 border-amber-600"
+                        : recipientColors[field.recipientIndex % recipientColors.length];
 
                       return (
                         <div
@@ -619,7 +626,9 @@ export default function TemplateEditorPage() {
                         >
                           <Icon className="h-3 w-3" />
                           <span className="truncate">
-                            {fieldType?.label} (R{field.recipientIndex + 1})
+                            {isSenderFill
+                              ? `Sender Fill${field.label ? `: ${field.label}` : ""}`
+                              : `${fieldType?.label} (R${field.recipientIndex + 1})`}
                           </span>
                           <button
                             className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 rounded-full p-0.5 transition-opacity"
@@ -679,6 +688,24 @@ export default function TemplateEditorPage() {
                 </p>
 
                 <div className="space-y-2">
+                  {/* Sender Fill slot */}
+                  <button
+                    onClick={() => setSelectedRecipientIndex(SENDER_FILL_INDEX)}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors border border-dashed",
+                      selectedRecipientIndex === SENDER_FILL_INDEX
+                        ? "bg-amber-500 text-white border-amber-500"
+                        : "border-amber-300 text-amber-700 hover:bg-amber-50"
+                    )}
+                  >
+                    <AlignLeft className="h-3.5 w-3.5" />
+                    <span>Sender Fill</span>
+                    <span className="ml-auto text-xs opacity-70">
+                      {fields.filter(f => f.recipientIndex === SENDER_FILL_INDEX).length} fields
+                    </span>
+                  </button>
+
+                  {/* Recipient slots */}
                   {Array.from({ length: numRecipientSlots }).map((_, index) => (
                     <button
                       key={index}
@@ -897,13 +924,36 @@ export default function TemplateEditorPage() {
                     return (
                       <>
                         <div className="flex items-center gap-2 text-sm">
-                          <div className={cn("w-3 h-3 rounded-full", recipientColors[field.recipientIndex % recipientColors.length])} />
-                          <span>{(field.type === "date" || field.type === "date_auto") ? "Date" : fieldType?.label} - Recipient {field.recipientIndex + 1}</span>
+                          {field.recipientIndex === SENDER_FILL_INDEX ? (
+                            <div className="w-3 h-3 rounded-full bg-amber-500" />
+                          ) : (
+                            <div className={cn("w-3 h-3 rounded-full", recipientColors[field.recipientIndex % recipientColors.length])} />
+                          )}
+                          <span>
+                            {field.recipientIndex === SENDER_FILL_INDEX
+                              ? `Sender Fill - ${fieldType?.label || field.type}`
+                              : `${(field.type === "date" || field.type === "date_auto") ? "Date" : fieldType?.label} - Recipient ${field.recipientIndex + 1}`}
+                          </span>
                         </div>
                         <div className="text-xs text-muted-foreground">
                           Page {field.page}, Position: ({Math.round(field.xPosition)}, {Math.round(field.yPosition)})
                         </div>
-                        {!["signature", "initials", "date", "date_auto", "checkbox"].includes(field.type) && (
+                        {field.recipientIndex === SENDER_FILL_INDEX && (
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium">Field Label</p>
+                            <Input
+                              value={field.label || ""}
+                              placeholder="e.g. Compensation Details"
+                              className="text-xs h-8"
+                              onChange={(e) => {
+                                setFields(prev => prev.map(f => f.id === selectedFieldId ? { ...f, label: e.target.value } : f));
+                                setHasChanges(true);
+                              }}
+                            />
+                            <p className="text-xs text-muted-foreground">Describes what the sender should fill in before sending</p>
+                          </div>
+                        )}
+                        {field.recipientIndex !== SENDER_FILL_INDEX && !["signature", "initials", "date", "date_auto", "checkbox"].includes(field.type) && (
                           <div className="space-y-1">
                             <p className="text-xs font-medium">Field type</p>
                             <select
@@ -1008,6 +1058,9 @@ export default function TemplateEditorPage() {
                   <li>3. Click on the PDF to place the field</li>
                   <li>4. Drag fields to reposition them</li>
                   <li>5. Click Save when done</li>
+                  <li className="border-t pt-2 text-amber-700">
+                    <strong>Sender Fill:</strong> Use the amber "Sender Fill" slot for fields the sender fills in before sending. Great for terms, pricing, or custom clauses.
+                  </li>
                 </ul>
               </CardContent>
             </Card>

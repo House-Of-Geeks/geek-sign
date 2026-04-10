@@ -80,6 +80,7 @@ const fieldLabels: Record<string, string> = {
   number: "Number",
   postcodes: "Postcodes",
   dropdown: "Dropdown",
+  sender_paragraph: "Sender Fill",
 };
 
 // Helper to get field type and label for custom/dropdown fields
@@ -95,6 +96,12 @@ export function getFieldTypeInfo(type: string): { baseType: string; label: strin
     return {
       baseType: "dropdown",
       label: parts[1] || "Dropdown",
+    };
+  }
+  if (type.startsWith("sender_")) {
+    return {
+      baseType: type,
+      label: "Sender Fill",
     };
   }
   return {

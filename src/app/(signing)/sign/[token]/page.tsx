@@ -38,6 +38,7 @@ import {
   ZoomIn,
   ZoomOut,
   Upload,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -219,6 +220,11 @@ export default function SignPage({ params }: SignPageProps) {
     setCurrentFieldIndex(index);
     const field = fields[index];
     const { baseType } = getFieldTypeInfo(field.type);
+
+    // Sender-fill fields are read-only — recipients cannot edit them
+    if (field.type.startsWith("sender_")) {
+      return;
+    }
 
     if (baseType === "signature" || baseType === "initials") {
       setShowSignatureModal(true);
@@ -585,13 +591,31 @@ export default function SignPage({ params }: SignPageProps) {
             <CardHeader>
               <CardTitle className="text-lg">Fields to Complete</CardTitle>
               <CardDescription>
-                {fields.filter((f) => f.value).length} of {fields.length} completed
+                {fields.filter((f) => f.value && !f.type.startsWith("sender_")).length} of {fields.filter((f) => !f.type.startsWith("sender_")).length} completed
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
                 {fields.map((field, index) => {
                   const { baseType, label: fieldLabel } = getFieldTypeInfo(field.type);
+                  const isSenderFill = field.type.startsWith("sender_");
+
+                  if (isSenderFill) {
+                    return (
+                      <div
+                        key={field.id}
+                        className="w-full flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-left"
+                      >
+                        <Lock className="h-4 w-4 text-amber-600 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-amber-800 truncate">{fieldLabel}</p>
+                          <p className="text-xs text-amber-600">Pre-filled by sender</p>
+                        </div>
+                        <CheckCircle2 className="h-4 w-4 text-amber-500 shrink-0" />
+                      </div>
+                    );
+                  }
+
                   return (
                     <button
                       key={field.id}
@@ -728,6 +752,30 @@ export default function SignPage({ params }: SignPageProps) {
                       {currentPageFields.map((field, index) => {
                         const globalIndex = fields.findIndex(f => f.id === field.id);
                         const { baseType, label: fieldLabel } = getFieldTypeInfo(field.type);
+                        const isSenderFill = field.type.startsWith("sender_");
+
+                        if (isSenderFill) {
+                          return (
+                            <div
+                              key={field.id}
+                              className="absolute rounded overflow-hidden border border-amber-200 bg-transparent"
+                              style={{
+                                left: field.xPosition * scale,
+                                top: field.yPosition * scale,
+                                width: field.width * scale,
+                                height: field.height * scale,
+                              }}
+                            >
+                              <span
+                                className="block w-full h-full text-gray-800 p-1 overflow-hidden leading-snug"
+                                style={{ fontSize: `${Math.max(8, 11 * scale)}px` }}
+                              >
+                                {field.value || ""}
+                              </span>
+                            </div>
+                          );
+                        }
+
                         return (
                           <button
                             key={field.id}

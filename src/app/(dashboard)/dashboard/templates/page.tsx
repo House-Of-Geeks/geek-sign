@@ -62,7 +62,10 @@ interface RecipientSlot {
 }
 
 interface TemplateFieldInfo {
+  id?: string;
   recipientIndex?: number;
+  label?: string;
+  type?: string;
 }
 
 interface Template {
@@ -100,6 +103,8 @@ export default function TemplatesPage() {
     customMessage: "",
   });
   const [useTemplateSlots, setUseTemplateSlots] = useState<Array<{ email: string; name: string }>>([{ email: "", name: "" }]);
+  const [templateSenderFields, setTemplateSenderFields] = useState<TemplateFieldInfo[]>([]);
+  const [senderFieldValues, setSenderFieldValues] = useState<Record<string, string>>({});
   const [isCreatingDocument, setIsCreatingDocument] = useState(false);
 
   useEffect(() => {
@@ -203,6 +208,7 @@ export default function TemplatesPage() {
           title: useTemplateData.title,
           recipientEmails,
           customMessage: useTemplateData.customMessage || undefined,
+          senderFieldValues: Object.keys(senderFieldValues).length > 0 ? senderFieldValues : undefined,
         }),
       });
 
@@ -233,6 +239,8 @@ export default function TemplatesPage() {
       setUseTemplateId(null);
       setUseTemplateData({ title: "", customMessage: "" });
       setUseTemplateSlots([{ email: "", name: "" }]);
+      setTemplateSenderFields([]);
+      setSenderFieldValues({});
     }
   };
 
@@ -333,17 +341,24 @@ export default function TemplatesPage() {
                       onClick={() => {
                         setUseTemplateId(template.id);
                         setUseTemplateData({ title: template.name, customMessage: "" });
-                        // Compute slot count from fields and recipientSlots
+                        // Compute slot count from fields and recipientSlots (exclude sender-fill fields)
                         const slots = template.recipientSlots || [];
                         const fields = template.fields || [];
-                        const maxFieldIndex = fields.reduce((max, f) => Math.max(max, f.recipientIndex ?? 0), 0);
-                        const numSlots = Math.max(1, slots.length, fields.length > 0 ? maxFieldIndex + 1 : 0);
+                        const regularFields = fields.filter((f: TemplateFieldInfo) => (f.recipientIndex ?? 0) >= 0);
+                        const maxFieldIndex = regularFields.reduce((max: number, f: TemplateFieldInfo) => Math.max(max, f.recipientIndex ?? 0), 0);
+                        const numSlots = Math.max(1, slots.length, regularFields.length > 0 ? maxFieldIndex + 1 : 0);
                         setUseTemplateSlots(
                           Array.from({ length: numSlots }).map((_, i) => ({
                             email: slots[i]?.preAssignedEmail || "",
                             name: slots[i]?.preAssignedName || "",
                           }))
                         );
+                        // Detect sender-fill fields
+                        const senderFields = fields.filter((f: TemplateFieldInfo) => f.recipientIndex === -1);
+                        setTemplateSenderFields(senderFields);
+                        const initVals: Record<string, string> = {};
+                        senderFields.forEach((f: TemplateFieldInfo) => { if (f.id) initVals[f.id] = ""; });
+                        setSenderFieldValues(initVals);
                       }}
                     >
                       <Copy className="mr-2 h-4 w-4" />
@@ -434,6 +449,8 @@ export default function TemplatesPage() {
           setUseTemplateId(null);
           setUseTemplateData({ title: "", customMessage: "" });
           setUseTemplateSlots([{ email: "", name: "" }]);
+          setTemplateSenderFields([]);
+          setSenderFieldValues({});
         }}
       >
         <DialogContent>
@@ -487,6 +504,32 @@ export default function TemplatesPage() {
                 </div>
               ))}
             </div>
+            {templateSenderFields.length > 0 && (
+              <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <div>
+                  <Label className="text-sm font-medium text-amber-900">Sender Fill Fields</Label>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    Fill in these fields before sending — they will appear in the document for recipients to read.
+                  </p>
+                </div>
+                {templateSenderFields.map((field) => (
+                  <div key={field.id} className="space-y-1">
+                    <Label className="text-xs text-amber-800">{field.label || "Text Content"}</Label>
+                    <Textarea
+                      value={field.id ? (senderFieldValues[field.id] || "") : ""}
+                      onChange={(e) => {
+                        if (field.id) {
+                          setSenderFieldValues(prev => ({ ...prev, [field.id!]: e.target.value }));
+                        }
+                      }}
+                      placeholder={`Enter ${field.label || "content"}...`}
+                      rows={3}
+                      className="bg-white"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="message">Custom Message (optional)</Label>
               <Textarea

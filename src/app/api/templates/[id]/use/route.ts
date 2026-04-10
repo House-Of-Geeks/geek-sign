@@ -14,6 +14,8 @@ async function getTeamIds(userId: string): Promise<string[]> {
 }
 
 interface TemplateField {
+  id?: string;
+  label?: string;
   type: string;
   page: number;
   xPosition: number;
@@ -57,7 +59,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { title, recipientEmails, customMessage } = body;
+    const { title, recipientEmails, customMessage, senderFieldValues } = body;
 
     if (!title) {
       return NextResponse.json(
@@ -136,22 +138,43 @@ export async function POST(
       const templateFields = template.fields as TemplateField[];
 
       for (const field of templateFields) {
-        // Determine which recipient this field belongs to
         const recipientIndex = field.recipientIndex ?? 0;
-        const recipient = createdRecipients[recipientIndex] || createdRecipients[0];
 
-        if (recipient) {
-          await db.insert(documentFields).values({
-            documentId: newDocument.id,
-            recipientId: recipient.id,
-            type: field.type,
-            page: field.page || 1,
-            xPosition: field.xPosition,
-            yPosition: field.yPosition,
-            width: field.width,
-            height: field.height,
-            required: field.required ?? true,
-          });
+        if (recipientIndex === -1) {
+          // Sender-fill field: assign to recipient 0 with the sender's pre-filled value
+          const recipient = createdRecipients[0];
+          if (recipient) {
+            const fieldId = field.id || "";
+            const value = (senderFieldValues as Record<string, string> | undefined)?.[fieldId] || null;
+            await db.insert(documentFields).values({
+              documentId: newDocument.id,
+              recipientId: recipient.id,
+              type: "sender_paragraph",
+              page: field.page || 1,
+              xPosition: field.xPosition,
+              yPosition: field.yPosition,
+              width: field.width,
+              height: field.height,
+              required: false,
+              value,
+            });
+          }
+        } else {
+          // Normal recipient field
+          const recipient = createdRecipients[recipientIndex] || createdRecipients[0];
+          if (recipient) {
+            await db.insert(documentFields).values({
+              documentId: newDocument.id,
+              recipientId: recipient.id,
+              type: field.type,
+              page: field.page || 1,
+              xPosition: field.xPosition,
+              yPosition: field.yPosition,
+              width: field.width,
+              height: field.height,
+              required: field.required ?? true,
+            });
+          }
         }
       }
     }
