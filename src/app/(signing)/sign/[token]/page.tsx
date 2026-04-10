@@ -39,6 +39,7 @@ import {
   ZoomOut,
   Upload,
   Lock,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -269,6 +270,12 @@ export default function SignPage({ params }: SignPageProps) {
     }
   };
 
+  const clearField = (index: number) => {
+    const updatedFields = [...fields];
+    updatedFields[index] = { ...updatedFields[index], value: null };
+    setFields(updatedFields);
+  };
+
   const handleSignatureSubmit = async () => {
     if (!signatureValue.trim()) {
       toast({
@@ -322,21 +329,24 @@ export default function SignPage({ params }: SignPageProps) {
   };
 
   const handleTextFieldSubmit = () => {
+    const currentField = fields[currentFieldIndex];
     if (!textFieldValue.trim()) {
-      const currentField = fields[currentFieldIndex];
-      const { label: fieldLabel } = currentField ? getFieldTypeInfo(currentField.type) : { label: "value" };
-      toast({
-        title: "Value required",
-        description: `Please enter your ${fieldLabel.toLowerCase()}.`,
-        variant: "destructive",
-      });
-      return;
+      if (currentField?.required !== false) {
+        const { label: fieldLabel } = currentField ? getFieldTypeInfo(currentField.type) : { label: "value" };
+        toast({
+          title: "Value required",
+          description: `Please enter your ${fieldLabel.toLowerCase()}.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      // Optional field — empty value clears it
     }
 
     const updatedFields = [...fields];
     updatedFields[currentFieldIndex] = {
       ...updatedFields[currentFieldIndex],
-      value: textFieldValue,
+      value: textFieldValue.trim() || null,
     };
     setFields(updatedFields);
     setShowTextFieldModal(false);
@@ -687,41 +697,52 @@ export default function SignPage({ params }: SignPageProps) {
                   }
 
                   return (
-                    <button
-                      key={field.id}
-                      onClick={() => handleFieldClick(index)}
-                      disabled={!hasConsented}
-                      className={cn(
-                        "w-full flex items-center gap-3 rounded-lg border p-3 text-left transition-colors",
-                        !hasConsented && "opacity-50 cursor-not-allowed",
-                        field.value
-                          ? "border-green-200 bg-green-50"
-                          : currentFieldIndex === index
-                          ? "border-primary bg-primary/5"
-                          : "hover:bg-muted"
-                      )}
-                    >
-                      {baseType === "signature" && <Pen className="h-4 w-4" />}
-                      {baseType === "initials" && <Type className="h-4 w-4" />}
-                      {(baseType === "date" || baseType === "date_auto") && <Calendar className="h-4 w-4" />}
-                      {(baseType === "text" || baseType === "name" || baseType === "email" || baseType === "address" || baseType === "title" || baseType === "custom") && <Type className="h-4 w-4" />}
-                      {baseType === "checkbox" && (
-                        <div className={cn("h-4 w-4 rounded border-2 flex items-center justify-center shrink-0", field.value === "checked" ? "border-green-500 bg-green-100" : "border-muted-foreground")}>
-                          {field.value === "checked" && <CheckCircle2 className="h-3 w-3 text-green-600" />}
+                    <div key={field.id} className="relative">
+                      <button
+                        onClick={() => handleFieldClick(index)}
+                        disabled={!hasConsented}
+                        className={cn(
+                          "w-full flex items-center gap-3 rounded-lg border p-3 text-left transition-colors",
+                          !hasConsented && "opacity-50 cursor-not-allowed",
+                          field.value
+                            ? "border-green-200 bg-green-50"
+                            : currentFieldIndex === index
+                            ? "border-primary bg-primary/5"
+                            : "hover:bg-muted",
+                          !field.required && field.value && !field.type.startsWith("sender_") && "pr-9"
+                        )}
+                      >
+                        {baseType === "signature" && <Pen className="h-4 w-4" />}
+                        {baseType === "initials" && <Type className="h-4 w-4" />}
+                        {(baseType === "date" || baseType === "date_auto") && <Calendar className="h-4 w-4" />}
+                        {(baseType === "text" || baseType === "name" || baseType === "email" || baseType === "address" || baseType === "title" || baseType === "custom") && <Type className="h-4 w-4" />}
+                        {baseType === "checkbox" && (
+                          <div className={cn("h-4 w-4 rounded border-2 flex items-center justify-center shrink-0", field.value === "checked" ? "border-green-500 bg-green-100" : "border-muted-foreground")}>
+                            {field.value === "checked" && <CheckCircle2 className="h-3 w-3 text-green-600" />}
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{fieldLabel}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {baseType === "checkbox"
+                              ? field.value === "checked" ? "Checked" : !field.required ? "Optional — click to check" : "Click to check"
+                              : baseType === "date_auto" ? "Auto-filled" : field.value ? "Completed" : !field.required ? "Optional" : "Click to fill"}
+                          </p>
                         </div>
+                        {field.value && (
+                          <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                        )}
+                      </button>
+                      {!field.required && field.value && !field.type.startsWith("sender_") && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); clearField(index); }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-red-100 text-muted-foreground hover:text-red-500 transition-colors"
+                          title="Clear field"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
                       )}
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{fieldLabel}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {baseType === "checkbox"
-                            ? field.value === "checked" ? "Checked" : !field.required ? "Optional — click to check" : "Click to check"
-                            : baseType === "date_auto" ? "Auto-filled" : field.value ? "Completed" : !field.required ? "Optional" : "Click to fill"}
-                        </p>
-                      </div>
-                      {field.value && (
-                        <CheckCircle2 className="h-4 w-4 text-green-600" />
-                      )}
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -1200,6 +1221,16 @@ export default function SignPage({ params }: SignPageProps) {
                   </div>
                 </div>
                 <div className="flex gap-3">
+                  {fields[currentFieldIndex]?.required === false && fields[currentFieldIndex]?.value && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => { clearField(currentFieldIndex); setShowTextFieldModal(false); setTextFieldValue(""); }}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Clear
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     onClick={() => setShowTextFieldModal(false)}
@@ -1259,6 +1290,16 @@ export default function SignPage({ params }: SignPageProps) {
             )}
           </div>
           <div className="flex gap-3">
+            {fields[currentFieldIndex]?.required === false && fields[currentFieldIndex]?.value && (
+              <Button
+                variant="ghost"
+                onClick={() => { clearField(currentFieldIndex); setShowPostcodesModal(false); setPostcodesValue(""); }}
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Clear
+              </Button>
+            )}
             <Button variant="outline" onClick={() => { setShowPostcodesModal(false); setPostcodesValue(""); }} className="flex-1">
               Cancel
             </Button>
