@@ -132,6 +132,8 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
   const [newRecipientName, setNewRecipientName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [showSendDialog, setShowSendDialog] = useState(false);
+  const [sendFromName, setSendFromName] = useState("");
   const [selectedRecipientId, setSelectedRecipientId] = useState<string | null>(null);
   const [selectedFieldType, setSelectedFieldType] = useState<string>("signature");
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
@@ -502,7 +504,7 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
     }
   };
 
-  const sendForSigning = async () => {
+  const sendForSigning = async (fromName?: string) => {
     if (recipients.length === 0) {
       toast({
         title: "No recipients",
@@ -522,10 +524,13 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
     }
 
     setIsSending(true);
+    setShowSendDialog(false);
 
     try {
       const response = await fetch(`/api/documents/${params.id}/send`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ senderName: fromName?.trim() || undefined }),
       });
 
       const data = await response.json();
@@ -681,7 +686,7 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
           </div>
         </div>
 
-        <Button onClick={sendForSigning} disabled={isSending || recipients.length === 0 || fields.length === 0}>
+        <Button onClick={() => setShowSendDialog(true)} disabled={isSending || recipients.length === 0 || fields.length === 0}>
           {isSending ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1241,6 +1246,40 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
           </div>
         </div>
       </div>
+
+      {/* Send for Signing Dialog */}
+      <Dialog open={showSendDialog} onOpenChange={setShowSendDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send for Signing</DialogTitle>
+            <DialogDescription>
+              Review who this request will appear to come from before sending.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="send-from-name">From name</Label>
+              <Input
+                id="send-from-name"
+                placeholder={session?.user?.name || "e.g. Why Solar"}
+                value={sendFromName}
+                onChange={(e) => setSendFromName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") sendForSigning(sendFromName); }}
+              />
+              <p className="text-xs text-muted-foreground">
+                Signers will see &ldquo;<strong>{sendFromName || session?.user?.name || "Your Name"}</strong> requested your signature on &hellip;&rdquo;
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSendDialog(false)}>Cancel</Button>
+            <Button onClick={() => sendForSigning(sendFromName)} disabled={isSending}>
+              <Send className="mr-2 h-4 w-4" />
+              Send
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Custom Field Dialog */}
       <Dialog open={showCustomFieldDialog} onOpenChange={setShowCustomFieldDialog}>

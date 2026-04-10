@@ -69,6 +69,17 @@ export async function POST(
       );
     }
 
+    // Read optional sender name override from request body
+    let senderNameOverride: string | undefined;
+    try {
+      const body = await request.json();
+      if (body?.senderName && typeof body.senderName === "string") {
+        senderNameOverride = body.senderName.trim() || undefined;
+      }
+    } catch {
+      // body may be empty — that's fine
+    }
+
     // Update document status to pending
     const [updatedDocument] = await db
       .update(documents)
@@ -90,7 +101,7 @@ export async function POST(
     });
 
     // Send email invitations to all recipients
-    const senderName = user.sendAsName || user.name || user.email;
+    const senderName = senderNameOverride || user.sendAsName || user.name || user.email;
     const emailPromises = documentRecipients.map((recipient) => {
       const signUrl = `${APP_URL}/sign/${recipient.signingToken}`;
       return sendSignerInviteEmail({
