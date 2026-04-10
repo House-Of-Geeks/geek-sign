@@ -107,7 +107,7 @@ export default function SignPage({ params }: SignPageProps) {
   const [isRecordingConsent, setIsRecordingConsent] = useState(false);
 
   // Text field modal state
-  const [showTextFieldModal, setShowTextFieldModal] = useState(false);
+
   const [textFieldValue, setTextFieldValue] = useState("");
 
   // Postcodes modal state
@@ -264,9 +264,8 @@ export default function SignPage({ params }: SignPageProps) {
     } else if (baseType === "dropdown") {
       setShowDropdownModal(true);
     } else {
-      // Open text field modal for all other field types (name, email, address, company, phone, etc.)
+      // Show inline input bar — no modal, PDF stays visible
       setTextFieldValue(field.value || "");
-      setShowTextFieldModal(true);
     }
   };
 
@@ -274,6 +273,96 @@ export default function SignPage({ params }: SignPageProps) {
     const updatedFields = [...fields];
     updatedFields[index] = { ...updatedFields[index], value: null };
     setFields(updatedFields);
+  };
+
+  // Fields the inline bar handles (everything except signature, checkbox, postcodes, dropdown, sender, date_auto)
+  const isInlineTextField = (field: { type: string } | undefined) => {
+    if (!field) return false;
+    const { baseType } = getFieldTypeInfo(field.type);
+    return !["signature", "initials", "checkbox", "date_auto", "postcodes", "dropdown"].includes(baseType)
+      && !field.type.startsWith("sender_");
+  };
+
+  // All navigable (non-sender, non-date_auto) fields with their global indices
+  const navigableFields = fields
+    .map((f, i) => ({ f, i }))
+    .filter(({ f }) => !f.type.startsWith("sender_") && f.type !== "date_auto");
+
+  const currentNavIdx = navigableFields.findIndex(({ i }) => i === currentFieldIndex);
+
+  const applyInlineValue = (updatedFields: typeof fields) => {
+    // After saving current text field, move to the next navigable field
+    const nextItem = navigableFields[currentNavIdx + 1];
+    if (!nextItem) {
+      setCurrentFieldIndex(-1);
+      setTextFieldValue("");
+      return;
+    }
+    const { f: nextField, i: nextIndex } = nextItem;
+    const { baseType: nextBaseType } = getFieldTypeInfo(nextField.type);
+    if (nextField.page !== currentPage) setCurrentPage(nextField.page);
+    setCurrentFieldIndex(nextIndex);
+    if (nextBaseType === "signature" || nextBaseType === "initials") {
+      setTextFieldValue("");
+      setShowSignatureModal(true);
+    } else if (nextBaseType === "checkbox") {
+      setTextFieldValue("");
+    } else if (nextBaseType === "postcodes") {
+      setPostcodesValue(updatedFields[nextIndex]?.value || "");
+      setTextFieldValue("");
+      setShowPostcodesModal(true);
+    } else if (nextBaseType === "dropdown") {
+      setTextFieldValue("");
+      setShowDropdownModal(true);
+    } else if (nextBaseType === "date") {
+      setTextFieldValue("");
+      handleDateFieldClick(nextIndex);
+    } else {
+      setTextFieldValue(updatedFields[nextIndex]?.value || "");
+    }
+  };
+
+  const handleInlineNext = () => {
+    const currentField = fields[currentFieldIndex];
+    if (!textFieldValue.trim() && currentField?.required !== false) {
+      const { label: fieldLabel } = getFieldTypeInfo(currentField?.type || "");
+      toast({
+        title: "Value required",
+        description: `Please enter your ${fieldLabel.toLowerCase()}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    const updatedFields = [...fields];
+    updatedFields[currentFieldIndex] = {
+      ...updatedFields[currentFieldIndex],
+      value: textFieldValue.trim() || null,
+    };
+    setFields(updatedFields);
+    setTextFieldValue("");
+    applyInlineValue(updatedFields);
+  };
+
+  const handleInlinePrev = () => {
+    // Save current draft silently
+    if (currentFieldIndex >= 0 && isInlineTextField(fields[currentFieldIndex])) {
+      const updatedFields = [...fields];
+      updatedFields[currentFieldIndex] = {
+        ...updatedFields[currentFieldIndex],
+        value: textFieldValue.trim() || null,
+      };
+      setFields(updatedFields);
+    }
+    const prevItem = navigableFields[currentNavIdx - 1];
+    if (!prevItem) return;
+    const { f: prevField, i: prevIndex } = prevItem;
+    if (prevField.page !== currentPage) setCurrentPage(prevField.page);
+    setCurrentFieldIndex(prevIndex);
+    if (isInlineTextField(prevField)) {
+      setTextFieldValue(prevField.value || "");
+    } else {
+      setTextFieldValue("");
+    }
   };
 
   const handleSignatureSubmit = async () => {
@@ -313,52 +402,7 @@ export default function SignPage({ params }: SignPageProps) {
     setSaveSignatureChecked(false);
     setSignatureValue("");
 
-    // Move to next unsigned field
-    const nextUnsigned = updatedFields.findIndex(
-      (f, i) => i > currentFieldIndex && !f.value
-    );
-    if (nextUnsigned !== -1) {
-      setCurrentFieldIndex(nextUnsigned);
-    }
-  };
-
-  const handleTextFieldChange = (index: number, value: string) => {
-    const updatedFields = [...fields];
-    updatedFields[index] = { ...updatedFields[index], value };
-    setFields(updatedFields);
-  };
-
-  const handleTextFieldSubmit = () => {
-    const currentField = fields[currentFieldIndex];
-    if (!textFieldValue.trim()) {
-      if (currentField?.required !== false) {
-        const { label: fieldLabel } = currentField ? getFieldTypeInfo(currentField.type) : { label: "value" };
-        toast({
-          title: "Value required",
-          description: `Please enter your ${fieldLabel.toLowerCase()}.`,
-          variant: "destructive",
-        });
-        return;
-      }
-      // Optional field — empty value clears it
-    }
-
-    const updatedFields = [...fields];
-    updatedFields[currentFieldIndex] = {
-      ...updatedFields[currentFieldIndex],
-      value: textFieldValue.trim() || null,
-    };
-    setFields(updatedFields);
-    setShowTextFieldModal(false);
-    setTextFieldValue("");
-
-    // Move to next unsigned field
-    const nextUnsigned = updatedFields.findIndex(
-      (f, i) => i > currentFieldIndex && !f.value
-    );
-    if (nextUnsigned !== -1) {
-      setCurrentFieldIndex(nextUnsigned);
-    }
+    applyInlineValue(updatedFields);
   };
 
   const handleDateFieldClick = (index: number) => {
@@ -387,8 +431,7 @@ export default function SignPage({ params }: SignPageProps) {
     setFields(updatedFields);
     setShowPostcodesModal(false);
     setPostcodesValue("");
-    const nextUnsigned = updatedFields.findIndex((f, i) => i > currentFieldIndex && !f.value);
-    if (nextUnsigned !== -1) setCurrentFieldIndex(nextUnsigned);
+    applyInlineValue(updatedFields);
   };
 
   const handlePostcodesFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -770,7 +813,7 @@ export default function SignPage({ params }: SignPageProps) {
         </div>
 
         {/* Document Preview */}
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-3 flex flex-col gap-3">
           <Card>
             <CardContent className="p-4">
               {/* PDF Controls */}
@@ -953,6 +996,77 @@ export default function SignPage({ params }: SignPageProps) {
               </div>
             </CardContent>
           </Card>
+
+          {/* Inline Field Input Bar */}
+          {currentFieldIndex >= 0 && isInlineTextField(fields[currentFieldIndex]) && (() => {
+            const currentField = fields[currentFieldIndex];
+            const { label: fieldLabel } = getFieldTypeInfo(currentField.type);
+            const isLast = currentNavIdx === navigableFields.length - 1;
+            const isFirst = currentNavIdx === 0;
+            return (
+              <Card className="border-primary/40 shadow-md">
+                <CardContent className="p-4">
+                  <div className="flex items-end gap-3">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleInlinePrev}
+                      disabled={isFirst}
+                      title="Previous field"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="flex-1 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{fieldLabel}</span>
+                        {currentField.required === false && (
+                          <span className="text-xs border rounded px-1.5 py-0.5 text-muted-foreground">Optional</span>
+                        )}
+                        <span className="ml-auto text-xs text-muted-foreground">
+                          {currentNavIdx + 1} of {navigableFields.length}
+                        </span>
+                      </div>
+                      {currentField.type === "paragraph" ? (
+                        <Textarea
+                          placeholder={`Enter ${fieldLabel.toLowerCase()}...`}
+                          value={textFieldValue}
+                          onChange={(e) => setTextFieldValue(e.target.value)}
+                          className="min-h-[80px]"
+                          autoFocus
+                        />
+                      ) : (
+                        <Input
+                          type={currentField.type === "number" ? "number" : "text"}
+                          placeholder={`Enter your ${fieldLabel.toLowerCase()}`}
+                          value={textFieldValue}
+                          onChange={(e) => setTextFieldValue(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") handleInlineNext(); }}
+                          className="text-base"
+                          autoFocus
+                        />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {currentField.required === false && currentField.value && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => { clearField(currentFieldIndex); setTextFieldValue(""); }}
+                          className="text-muted-foreground hover:text-destructive"
+                          title="Clear field"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Button onClick={handleInlineNext} className="whitespace-nowrap">
+                        {isLast ? "Done" : "Next →"}
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
         </div>
       </div>
 
@@ -1172,79 +1286,6 @@ export default function SignPage({ params }: SignPageProps) {
               Apply {fields[currentFieldIndex]?.type === "signature" ? "Signature" : "Initials"}
             </Button>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Text Field Modal */}
-      <Dialog open={showTextFieldModal} onOpenChange={setShowTextFieldModal}>
-        <DialogContent>
-          {(() => {
-            const currentField = fields[currentFieldIndex];
-            const { label: fieldLabel } = currentField ? getFieldTypeInfo(currentField.type) : { label: "text" };
-            return (
-              <>
-                <DialogHeader>
-                  <DialogTitle>
-                    Enter Your {fieldLabel}
-                  </DialogTitle>
-                  <DialogDescription>
-                    Please enter your {fieldLabel.toLowerCase()} below.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="textfield">
-                      {fieldLabel}
-                    </Label>
-                    {currentField?.type === "paragraph" ? (
-                      <Textarea
-                        id="textfield"
-                        placeholder={`Enter ${fieldLabel.toLowerCase()}...`}
-                        value={textFieldValue}
-                        onChange={(e) => setTextFieldValue(e.target.value)}
-                        className="text-base min-h-[120px]"
-                        rows={5}
-                      />
-                    ) : (
-                      <Input
-                        id="textfield"
-                        type={currentField?.type === "number" ? "number" : "text"}
-                        placeholder={`Enter your ${fieldLabel.toLowerCase()}`}
-                        value={textFieldValue}
-                        onChange={(e) => setTextFieldValue(e.target.value)}
-                        className="text-lg"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleTextFieldSubmit();
-                        }}
-                      />
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-3">
-                  {fields[currentFieldIndex]?.required === false && fields[currentFieldIndex]?.value && (
-                    <Button
-                      variant="ghost"
-                      onClick={() => { clearField(currentFieldIndex); setShowTextFieldModal(false); setTextFieldValue(""); }}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <X className="h-4 w-4 mr-1" />
-                      Clear
-                    </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowTextFieldModal(false)}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button onClick={handleTextFieldSubmit} className="flex-1">
-                    Apply
-                  </Button>
-                </div>
-              </>
-            );
-          })()}
         </DialogContent>
       </Dialog>
 
