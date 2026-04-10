@@ -935,6 +935,7 @@ export default function SignPage({ params }: SignPageProps) {
                                 "absolute rounded transition-all flex items-center justify-center border-2",
                                 !hasConsented && "opacity-50 cursor-not-allowed",
                                 hasConsented && "cursor-pointer",
+                                globalIndex === currentFieldIndex && "ring-2 ring-primary ring-offset-1 shadow-lg animate-pulse",
                                 field.value === "checked"
                                   ? "border-green-500 bg-green-100"
                                   : "border-primary bg-white hover:bg-primary/10"
@@ -956,6 +957,7 @@ export default function SignPage({ params }: SignPageProps) {
                           );
                         }
 
+                        const isActive = globalIndex === currentFieldIndex;
                         return (
                           <button
                             key={field.id}
@@ -965,7 +967,9 @@ export default function SignPage({ params }: SignPageProps) {
                               "absolute border-2 rounded transition-all flex items-center justify-center",
                               !hasConsented && "opacity-50 cursor-not-allowed",
                               hasConsented && "cursor-pointer",
-                              field.value
+                              isActive
+                                ? "border-primary bg-primary/20 ring-2 ring-primary ring-offset-1 shadow-lg animate-pulse"
+                                : field.value
                                 ? "border-green-500 bg-green-50/90"
                                 : "border-primary bg-primary/10 hover:bg-primary/20"
                             )}
