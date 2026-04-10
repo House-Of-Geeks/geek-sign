@@ -113,6 +113,7 @@ export default function SignPage({ params }: SignPageProps) {
   // Postcodes modal state
   const [showPostcodesModal, setShowPostcodesModal] = useState(false);
   const [postcodesValue, setPostcodesValue] = useState("");
+  const [postcodesFieldId, setPostcodesFieldId] = useState<string | null>(null);
 
   // Dropdown modal state
   const [showDropdownModal, setShowDropdownModal] = useState(false);
@@ -262,6 +263,7 @@ export default function SignPage({ params }: SignPageProps) {
     } else if (baseType === "date") {
       handleDateFieldClick(index);
     } else if (baseType === "postcodes") {
+      setPostcodesFieldId(field.id);
       setPostcodesValue(field.value || "");
       setShowPostcodesModal(true);
     } else if (baseType === "dropdown") {
@@ -311,6 +313,7 @@ export default function SignPage({ params }: SignPageProps) {
     } else if (nextBaseType === "checkbox") {
       setTextFieldValue("");
     } else if (nextBaseType === "postcodes") {
+      setPostcodesFieldId(nextField.id);
       setPostcodesValue(updatedFields[nextIndex]?.value || "");
       setTextFieldValue("");
       setShowPostcodesModal(true);
@@ -467,12 +470,53 @@ export default function SignPage({ params }: SignPageProps) {
       toast({ title: "Postcodes required", description: "Please enter or upload postcodes.", variant: "destructive" });
       return;
     }
+    const fieldIndex = postcodesFieldId
+      ? fields.findIndex((f) => f.id === postcodesFieldId)
+      : currentFieldIndex;
+    if (fieldIndex < 0) return;
     const updatedFields = [...fields];
-    updatedFields[currentFieldIndex] = { ...updatedFields[currentFieldIndex], value: postcodesValue.trim() };
+    updatedFields[fieldIndex] = { ...updatedFields[fieldIndex], value: postcodesValue.trim() };
     setFields(updatedFields);
     setShowPostcodesModal(false);
     setPostcodesValue("");
-    applyInlineValue(updatedFields);
+    setPostcodesFieldId(null);
+    // Use fieldIndex for navigation in case currentFieldIndex drifted
+    const navIdx = navigableFields.findIndex(({ i }) => i === fieldIndex);
+    const nextItem = navigableFields[navIdx + 1];
+    if (!nextItem) {
+      setCurrentFieldIndex(-1);
+      setTextFieldValue("");
+      return;
+    }
+    const { f: nextField, i: nextIndex } = nextItem;
+    const { baseType: nextBaseType } = getFieldTypeInfo(nextField.type);
+    if (nextField.page !== currentPage) setCurrentPage(nextField.page);
+    setCurrentFieldIndex(nextIndex);
+    if (nextBaseType === "signature" || nextBaseType === "initials") {
+      setTextFieldValue("");
+      setShowSignatureModal(true);
+    } else if (nextBaseType === "checkbox") {
+      setTextFieldValue("");
+    } else if (nextBaseType === "postcodes") {
+      setPostcodesFieldId(nextField.id);
+      setPostcodesValue(updatedFields[nextIndex]?.value || "");
+      setTextFieldValue("");
+      setShowPostcodesModal(true);
+    } else if (nextBaseType === "dropdown") {
+      setTextFieldValue("");
+      setShowDropdownModal(true);
+    } else if (nextBaseType === "date") {
+      const todayISO = new Date().toISOString().split("T")[0];
+      const existing = updatedFields[nextIndex]?.value;
+      let isoVal = todayISO;
+      if (existing) {
+        const parsed = new Date(existing);
+        if (!isNaN(parsed.getTime())) isoVal = parsed.toISOString().split("T")[0];
+      }
+      setTextFieldValue(isoVal);
+    } else {
+      setTextFieldValue(updatedFields[nextIndex]?.value || "");
+    }
   };
 
   const handlePostcodesFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1427,7 +1471,7 @@ export default function SignPage({ params }: SignPageProps) {
             {fields[currentFieldIndex]?.required === false && fields[currentFieldIndex]?.value && (
               <Button
                 variant="ghost"
-                onClick={() => { clearField(currentFieldIndex); setShowPostcodesModal(false); setPostcodesValue(""); }}
+                onClick={() => { clearField(currentFieldIndex); setShowPostcodesModal(false); setPostcodesValue(""); setPostcodesFieldId(null); }}
                 className="text-muted-foreground hover:text-destructive"
               >
                 <X className="h-4 w-4 mr-1" />
