@@ -344,6 +344,18 @@ export default function SignPage({ params }: SignPageProps) {
     applyInlineValue(updatedFields);
   };
 
+  const handleInlineSkip = () => {
+    // Clear the optional field and advance
+    const updatedFields = [...fields];
+    updatedFields[currentFieldIndex] = {
+      ...updatedFields[currentFieldIndex],
+      value: null,
+    };
+    setFields(updatedFields);
+    setTextFieldValue("");
+    applyInlineValue(updatedFields);
+  };
+
   const handleInlinePrev = () => {
     // Save current draft silently
     if (currentFieldIndex >= 0 && isInlineTextField(fields[currentFieldIndex])) {
@@ -1096,6 +1108,11 @@ export default function SignPage({ params }: SignPageProps) {
                           title="Clear field"
                         >
                           <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {currentField.required === false && !isLast && (
+                        <Button variant="outline" onClick={handleInlineSkip} className="whitespace-nowrap">
+                          Skip
                         </Button>
                       )}
                       <Button onClick={handleInlineNext} className="whitespace-nowrap">
