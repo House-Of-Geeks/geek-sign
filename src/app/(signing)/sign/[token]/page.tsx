@@ -123,6 +123,7 @@ export default function SignPage({ params }: SignPageProps) {
   const [pdfLoading, setPdfLoading] = useState(true);
   const [pageSize, setPageSize] = useState({ width: 612, height: 792 });
   const pageContainerRef = useRef<HTMLDivElement>(null);
+  const pdfScrollRef = useRef<HTMLDivElement>(null);
 
   const { toast } = useToast();
 
@@ -220,6 +221,11 @@ export default function SignPage({ params }: SignPageProps) {
     setCurrentFieldIndex(index);
     const field = fields[index];
     const { baseType } = getFieldTypeInfo(field.type);
+
+    // Navigate to the page where this field lives
+    if (field.page && field.page !== currentPage) {
+      setCurrentPage(field.page);
+    }
 
     // Sender-fill fields are read-only — recipients cannot edit them
     if (field.type.startsWith("sender_")) {
@@ -450,6 +456,21 @@ export default function SignPage({ params }: SignPageProps) {
   const onPageLoadSuccess = (page: { width: number; height: number }) => {
     setPageSize({ width: page.width, height: page.height });
   };
+
+  // Scroll to field when currentFieldIndex changes (from sidebar click)
+  useEffect(() => {
+    if (currentFieldIndex < 0 || currentFieldIndex >= fields.length) return;
+    const field = fields[currentFieldIndex];
+    if (!field || !pdfScrollRef.current) return;
+    const timer = setTimeout(() => {
+      if (!pdfScrollRef.current) return;
+      const containerHeight = pdfScrollRef.current.clientHeight;
+      const fieldCenterY = field.yPosition * scale;
+      const scrollTo = fieldCenterY - containerHeight / 2 + (field.height * scale) / 2;
+      pdfScrollRef.current.scrollTo({ top: Math.max(0, scrollTo), behavior: "smooth" });
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [currentFieldIndex, currentPage]);
 
   // Get fields for current page
   const currentPageFields = fields.filter(f => f.page === currentPage);
@@ -740,7 +761,7 @@ export default function SignPage({ params }: SignPageProps) {
                 </div>
               )}
 
-              <div className="flex justify-center overflow-auto">
+              <div ref={pdfScrollRef} className="flex justify-center overflow-auto">
                 {document?.fileUrl ? (
                   <div
                     ref={pageContainerRef}
