@@ -457,6 +457,24 @@ export default function SignPage({ params }: SignPageProps) {
     setPageSize({ width: page.width, height: page.height });
   };
 
+  // Auto-save progress to the server whenever field values change
+  useEffect(() => {
+    const filledFields = fields.filter((f) => f.value && !f.type.startsWith("sender_"));
+    if (filledFields.length === 0) return;
+
+    const timer = setTimeout(() => {
+      fetch(`/api/sign/${params.token}/progress`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fields: filledFields.map((f) => ({ id: f.id, value: f.value })),
+        }),
+      }).catch(() => {}); // silent — don't interrupt signing on save failure
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [fields]);
+
   // Scroll to field when currentFieldIndex changes (from sidebar click)
   useEffect(() => {
     if (currentFieldIndex < 0 || currentFieldIndex >= fields.length) return;
