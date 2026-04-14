@@ -19,7 +19,6 @@ import {
   Lock,
   CheckCircle2,
   ArrowRight,
-  Star,
   PenTool,
   FileCheck,
 } from "lucide-react";
@@ -90,24 +89,21 @@ const howItWorks = [
   },
 ];
 
-const testimonials = [
+const useCases = [
   {
-    quote: "Geek Sign has transformed how we handle contracts. What used to take days now takes minutes.",
-    author: "Sarah Johnson",
-    role: "CEO, TechStart Inc.",
-    rating: 5,
+    icon: FileText,
+    title: "Service Agreements",
+    description: "Send client contracts and service agreements for signature without the back-and-forth of printing, scanning, or chasing physical copies.",
   },
   {
-    quote: "The simplest e-signature tool I've ever used. Clean interface and incredibly fast.",
-    author: "Michael Chen",
-    role: "Freelance Consultant",
-    rating: 5,
+    icon: Users,
+    title: "HR & Onboarding",
+    description: "Get employment contracts, NDAs, and onboarding paperwork signed before day one — from anywhere, on any device.",
   },
   {
-    quote: "Perfect for our small team. Affordable pricing and all the features we need.",
-    author: "Emily Rodriguez",
-    role: "HR Manager, GrowthCo",
-    rating: 5,
+    icon: PenTool,
+    title: "Proposals & Quotes",
+    description: "Turn accepted proposals into signed agreements instantly. Keep deals moving without unnecessary delays.",
   },
 ];
 
@@ -163,7 +159,7 @@ export default function HomePage() {
             <div className="max-w-xl">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/80 border border-brand-teal/20 shadow-sm mb-8 opacity-0 animate-fade-up">
                 <span className="flex h-2 w-2 rounded-full bg-brand-teal animate-pulse" />
-                <span className="text-sm font-medium text-brand-navy">Trusted by 10,000+ users</span>
+                <span className="text-sm font-medium text-brand-navy">Built in Australia &middot; Free to start</span>
               </div>
 
               <h1 className="heading-editorial text-5xl md:text-6xl lg:text-7xl text-brand-navy mb-6 opacity-0 animate-fade-up stagger-1">
@@ -368,38 +364,31 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Testimonials Section */}
+      {/* Use Cases Section */}
       <section className="container py-24 md:py-32">
         <div className="max-w-2xl mx-auto text-center mb-16">
           <span className="inline-block px-4 py-1.5 rounded-full bg-brand-orange/10 text-brand-orange text-sm font-medium mb-4">
-            Testimonials
+            Use Cases
           </span>
-          <h2 className="heading-editorial text-4xl md:text-5xl text-brand-navy">
-            Loved by teams everywhere
+          <h2 className="heading-editorial text-4xl md:text-5xl text-brand-navy mb-4">
+            Built for real work
           </h2>
+          <p className="text-lg text-muted-foreground">
+            Whether you&apos;re a team of one or a growing business, Geek Sign handles the paperwork so you don&apos;t have to.
+          </p>
         </div>
 
         <div className="grid gap-8 md:grid-cols-3 max-w-5xl mx-auto">
-          {testimonials.map((testimonial, index) => (
-            <Card key={index} className="border-0 bg-white shadow-sm hover-lift">
+          {useCases.map((useCase, index) => (
+            <Card key={index} className="border border-slate-100 bg-white shadow-sm hover-lift">
               <CardContent className="p-6">
-                <div className="flex gap-1 mb-4">
-                  {Array.from({ length: testimonial.rating }).map((_, i) => (
-                    <Star
-                      key={i}
-                      className="h-5 w-5 fill-amber-400 text-amber-400"
-                    />
-                  ))}
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-orange/10 text-brand-orange mb-4">
+                  <useCase.icon className="h-6 w-6" />
                 </div>
-                <blockquote className="text-lg text-brand-navy mb-6 leading-relaxed">
-                  &ldquo;{testimonial.quote}&rdquo;
-                </blockquote>
-                <div className="pt-4 border-t border-slate-100">
-                  <p className="font-semibold text-brand-navy">{testimonial.author}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {testimonial.role}
-                  </p>
-                </div>
+                <h3 className="text-xl font-semibold text-brand-navy mb-2">{useCase.title}</h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  {useCase.description}
+                </p>
               </CardContent>
             </Card>
           ))}
