@@ -46,7 +46,7 @@ const features = [
   {
     icon: Shield,
     title: "Legally Binding",
-    description: "Compliant with ESIGN Act and UETA. Your signatures are legally enforceable.",
+    description: "Compliant with electronic signature laws in Australia, the US, and internationally. Your signatures are legally enforceable.",
     size: "normal" as const,
   },
   {
@@ -114,7 +114,7 @@ const testimonials = [
 const faqs = [
   {
     question: "Is Geek Sign legally binding?",
-    answer: "Yes! Geek Sign is fully compliant with the ESIGN Act (Electronic Signatures in Global and National Commerce Act) and UETA (Uniform Electronic Transactions Act). Documents signed with Geek Sign are legally binding and enforceable in the United States and most countries worldwide.",
+    answer: "Yes! Geek Sign supports legally binding electronic signatures compliant with the Electronic Transactions Act 1999 (Australia), the ESIGN Act and UETA (United States), and applicable laws internationally. Your jurisdiction can be configured in account settings.",
   },
   {
     question: "Do signers need an account?",
@@ -353,7 +353,7 @@ export default function HomePage() {
       <section className="container py-16">
         <div className="flex flex-wrap items-center justify-center gap-8 md:gap-16">
           {[
-            { icon: Shield, text: "ESIGN Act & UETA Compliant" },
+            { icon: Shield, text: "Legally Compliant Signatures" },
             { icon: Lock, text: "Secure Cloud Storage" },
             { icon: Zap, text: "Instant Delivery" },
             { icon: CheckCircle2, text: "Complete Audit Trail" },

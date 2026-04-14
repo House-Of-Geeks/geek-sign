@@ -29,7 +29,7 @@ export default function SigningLayout({
       <footer className="border-t bg-background mt-auto">
         <div className="container py-4">
           <p className="text-xs text-center text-muted-foreground">
-            Powered by Geek Sign • ESIGN Act & UETA Compliant •{" "}
+            Powered by Geek Sign • Legally Compliant Electronic Signatures •{" "}
             <a href="/terms" className="hover:underline">Terms</a> •{" "}
             <a href="/privacy" className="hover:underline">Privacy</a>
           </p>

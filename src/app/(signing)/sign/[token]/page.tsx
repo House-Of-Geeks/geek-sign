@@ -44,6 +44,7 @@ import {
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { getFieldTypeInfo, getDropdownOptions } from "@/components/pdf/draggable-field";
+import { jurisdictionConfig, type Jurisdiction } from "@/config/jurisdiction";
 
 // Dynamically import PDF components to avoid SSR issues
 const PdfDocument = dynamic(
@@ -100,11 +101,12 @@ export default function SignPage({ params }: SignPageProps) {
   const [isComplete, setIsComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // ESIGN consent state
+  // Consent state
   const [showConsentModal, setShowConsentModal] = useState(false);
   const [hasConsented, setHasConsented] = useState(false);
   const [consentCheckbox, setConsentCheckbox] = useState(false);
   const [isRecordingConsent, setIsRecordingConsent] = useState(false);
+  const [jurisdiction, setJurisdiction] = useState<Jurisdiction>("AU");
 
   // Text field modal state
 
@@ -170,6 +172,7 @@ export default function SignPage({ params }: SignPageProps) {
         }));
         setSavedSignature(data.savedSignature ?? null);
         setSavedInitials(data.savedInitials ?? null);
+        if (data.jurisdiction) setJurisdiction(data.jurisdiction as Jurisdiction);
 
         // Check if consent was already given
         if (data.recipient.consentGiven) {
@@ -813,7 +816,7 @@ export default function SignPage({ params }: SignPageProps) {
                 <Shield className={cn("h-5 w-5", hasConsented ? "text-green-600" : "text-amber-600")} />
                 <div>
                   <p className="text-sm font-medium">
-                    {hasConsented ? "ESIGN Consent Given" : "Consent Required"}
+                    {hasConsented ? "Electronic Consent Given" : "Consent Required"}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {hasConsented
@@ -1207,7 +1210,7 @@ export default function SignPage({ params }: SignPageProps) {
         </div>
       </div>
 
-      {/* ESIGN Consent Modal */}
+      {/* Electronic Signature Consent Modal */}
       <Dialog open={showConsentModal} onOpenChange={setShowConsentModal}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -1221,18 +1224,15 @@ export default function SignPage({ params }: SignPageProps) {
           </DialogHeader>
 
           <div className="space-y-6 py-4">
-            {/* ESIGN Act Disclosure */}
+            {/* Jurisdiction-specific Disclosure */}
             <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
               <h3 className="font-semibold flex items-center gap-2">
                 <Shield className="h-4 w-4 text-primary" />
-                ESIGN Act Disclosure
+                {jurisdictionConfig[jurisdiction].consentTitle}
               </h3>
               <div className="text-sm text-muted-foreground space-y-2">
                 <p>
-                  In accordance with the Electronic Signatures in Global and National
-                  Commerce Act (ESIGN Act, 15 U.S.C. 7001 et seq.) and the Uniform
-                  Electronic Transactions Act (UETA), you are being asked to consent
-                  to the use of electronic signatures and electronic records.
+                  {jurisdictionConfig[jurisdiction].consentIntro}
                 </p>
                 <p><strong>By providing your electronic signature, you acknowledge and agree that:</strong></p>
                 <ul className="list-disc pl-5 space-y-1">

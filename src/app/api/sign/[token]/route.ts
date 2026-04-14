@@ -124,6 +124,13 @@ export async function GET(
       .where(eq(users.email, recipient.email))
       .limit(1);
 
+    // Get the document sender's jurisdiction setting
+    const [documentOwner] = await db
+      .select({ jurisdiction: users.jurisdiction })
+      .from(users)
+      .where(eq(users.id, document.userId))
+      .limit(1);
+
     return NextResponse.json({
       document: {
         id: document.id,
@@ -143,6 +150,7 @@ export async function GET(
       },
       savedSignature: signingUser?.savedSignature ?? null,
       savedInitials: signingUser?.savedInitials ?? null,
+      jurisdiction: (documentOwner?.jurisdiction ?? "AU") as "AU" | "US" | "OTHER",
       fields: fields.map((f) => ({
         id: f.id,
         type: f.type,

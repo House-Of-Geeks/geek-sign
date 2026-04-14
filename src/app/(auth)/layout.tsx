@@ -50,7 +50,7 @@ export default function AuthLayout({
           </h1>
           <p className="text-lg text-blue-100 mb-8">
             Upload, sign, and send unlimited documents with zero cost. Legally
-            compliant with ESIGN Act and UETA.
+            compliant with applicable electronic signature laws.
           </p>
           <div className="space-y-4">
             <div className="flex items-center gap-3">

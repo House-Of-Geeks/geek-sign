@@ -13,6 +13,7 @@ const updateProfileSchema = z.object({
   savedSignature: z.string().max(200).optional().nullable(),
   savedInitials: z.string().max(20).optional().nullable(),
   sendAsName: z.string().max(100).optional().nullable(),
+  jurisdiction: z.enum(["AU", "US", "OTHER"]).optional(),
 });
 
 export async function GET() {
@@ -36,6 +37,7 @@ export async function GET() {
         savedSignature: users.savedSignature,
         savedInitials: users.savedInitials,
         sendAsName: users.sendAsName,
+        jurisdiction: users.jurisdiction,
         createdAt: users.createdAt,
       })
       .from(users)
@@ -74,7 +76,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const { name, companyName, brandingLogoUrl, brandingPrimaryColor, savedSignature, savedInitials, sendAsName } = parsed.data;
+    const { name, companyName, brandingLogoUrl, brandingPrimaryColor, savedSignature, savedInitials, sendAsName, jurisdiction } = parsed.data;
 
     // Build update object with only provided fields
     const updateData: {
@@ -85,6 +87,7 @@ export async function PATCH(request: NextRequest) {
       savedSignature?: string | null;
       savedInitials?: string | null;
       sendAsName?: string | null;
+      jurisdiction?: string;
     } = {};
     if (name !== undefined) updateData.name = name;
     if (companyName !== undefined) updateData.companyName = companyName;
@@ -93,6 +96,7 @@ export async function PATCH(request: NextRequest) {
     if (savedSignature !== undefined) updateData.savedSignature = savedSignature;
     if (savedInitials !== undefined) updateData.savedInitials = savedInitials;
     if (sendAsName !== undefined) updateData.sendAsName = sendAsName;
+    if (jurisdiction !== undefined) updateData.jurisdiction = jurisdiction;
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(

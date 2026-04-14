@@ -34,7 +34,7 @@ const plansConfig: Record<Plan, PlanConfig> = {
       "Email notifications for signers",
       "Complete document finalization and distribution",
       "Detailed audit logs and record keeping",
-      "ESIGN Act and UETA compliant signatures",
+      "Legally compliant electronic signatures",
       "14-day document retention",
     ],
     notIncluded: [

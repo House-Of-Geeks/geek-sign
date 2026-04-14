@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { documents, recipients, documentFields, auditLogs } from "@/lib/db/schema";
+import { documents, recipients, documentFields, auditLogs, users } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import { jurisdictionConfig, type Jurisdiction } from "@/config/jurisdiction";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
 export async function GET(
@@ -48,6 +49,14 @@ export async function GET(
       .select()
       .from(documentFields)
       .where(eq(documentFields.documentId, id));
+
+    // Get document owner's jurisdiction
+    const [documentOwner] = await db
+      .select({ jurisdiction: users.jurisdiction })
+      .from(users)
+      .where(eq(users.id, session.user.id))
+      .limit(1);
+    const jurisdiction = (documentOwner?.jurisdiction ?? "AU") as Jurisdiction;
 
     // Fetch the original PDF
     const pdfResponse = await fetch(document.fileUrl);
@@ -412,7 +421,7 @@ export async function GET(
       }
     );
 
-    auditPage.drawText("Compliant with ESIGN Act (15 U.S.C. 7001) and UETA", {
+    auditPage.drawText(jurisdictionConfig[jurisdiction].auditText, {
       x: 50,
       y: 20,
       size: 8,

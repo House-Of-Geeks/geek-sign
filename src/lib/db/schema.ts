@@ -32,6 +32,8 @@ export const users = pgTable("users", {
   savedInitials: text("saved_initials"),
   // Custom sender display name for outgoing signature request emails
   sendAsName: text("send_as_name"),
+  // Jurisdiction for electronic signature compliance text (AU, US, OTHER)
+  jurisdiction: text("jurisdiction").default("AU").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

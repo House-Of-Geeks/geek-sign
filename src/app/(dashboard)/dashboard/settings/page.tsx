@@ -17,7 +17,9 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Camera, Save, Palette, Lock, Sparkles, Pen, Trash2 } from "lucide-react";
+import { Loader2, Camera, Save, Palette, Lock, Sparkles, Pen, Trash2, Globe } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { jurisdictions, type Jurisdiction } from "@/config/jurisdiction";
 
 interface PlanLimits {
   plan: string;
@@ -35,6 +37,7 @@ interface UserProfile {
   savedSignature: string | null;
   savedInitials: string | null;
   sendAsName: string | null;
+  jurisdiction: string | null;
 }
 
 export default function SettingsPage() {
@@ -44,6 +47,7 @@ export default function SettingsPage() {
   const [sendAsName, setSendAsName] = useState("");
   const [brandingLogoUrl, setBrandingLogoUrl] = useState("");
   const [brandingPrimaryColor, setBrandingPrimaryColor] = useState("#000000");
+  const [jurisdiction, setJurisdiction] = useState<Jurisdiction>("AU");
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingBranding, setIsSavingBranding] = useState(false);
   const [savedSignature, setSavedSignature] = useState<string | null>(null);
@@ -75,6 +79,7 @@ export default function SettingsPage() {
           const profile: UserProfile = await profileRes.json();
           if (profile.companyName) setCompanyName(profile.companyName);
           if (profile.sendAsName) setSendAsName(profile.sendAsName);
+          if (profile.jurisdiction) setJurisdiction(profile.jurisdiction as Jurisdiction);
           if (profile.brandingLogoUrl) setBrandingLogoUrl(profile.brandingLogoUrl);
           if (profile.brandingPrimaryColor) setBrandingPrimaryColor(profile.brandingPrimaryColor);
           setSavedSignature(profile.savedSignature ?? null);
@@ -99,7 +104,7 @@ export default function SettingsPage() {
       const response = await fetch("/api/user/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: fullName, companyName, sendAsName: sendAsName || null }),
+        body: JSON.stringify({ name: fullName, companyName, sendAsName: sendAsName || null, jurisdiction }),
       });
 
       if (!response.ok) throw new Error("Failed to update profile");
@@ -238,6 +243,25 @@ export default function SettingsPage() {
               />
               <p className="text-xs text-muted-foreground">
                 This name appears on signature request emails — e.g. &ldquo;Andy Smith requested your signature&rdquo;. Leave blank to use your full name.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="jurisdiction">Jurisdiction</Label>
+              <Select value={jurisdiction} onValueChange={(v) => setJurisdiction(v as Jurisdiction)}>
+                <SelectTrigger id="jurisdiction">
+                  <Globe className="mr-2 h-4 w-4 text-muted-foreground" />
+                  <SelectValue placeholder="Select jurisdiction" />
+                </SelectTrigger>
+                <SelectContent>
+                  {jurisdictions.map((j) => (
+                    <SelectItem key={j.value} value={j.value}>
+                      {j.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Sets which electronic signature law is referenced in consent disclosures and signed document audit trails.
               </p>
             </div>
             <div className="space-y-2">
