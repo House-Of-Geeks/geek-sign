@@ -246,11 +246,11 @@ export default function SettingsPage() {
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="jurisdiction">Jurisdiction</Label>
+              <Label htmlFor="jurisdiction">Base Country</Label>
               <Select value={jurisdiction} onValueChange={(v) => setJurisdiction(v as Jurisdiction)}>
                 <SelectTrigger id="jurisdiction">
                   <Globe className="mr-2 h-4 w-4 text-muted-foreground" />
-                  <SelectValue placeholder="Select jurisdiction" />
+                  <SelectValue placeholder="Select country" />
                 </SelectTrigger>
                 <SelectContent>
                   {jurisdictions.map((j) => (
@@ -261,7 +261,7 @@ export default function SettingsPage() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Sets which electronic signature law is referenced in consent disclosures and signed document audit trails.
+                Sets the electronic signature law referenced in your documents. This affects the consent disclosure your signers see before signing, and the compliance statement printed on the audit trail of every completed document. For example, Australian accounts reference the <em>Electronic Transactions Act 1999 (Cth)</em>; US accounts reference the <em>ESIGN Act and UETA</em>.
               </p>
             </div>
             <div className="space-y-2">
