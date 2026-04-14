@@ -1236,10 +1236,9 @@ export default function SignPage({ params }: SignPageProps) {
                 </p>
                 <p><strong>By providing your electronic signature, you acknowledge and agree that:</strong></p>
                 <ul className="list-disc pl-5 space-y-1">
-                  <li>Your electronic signature has the same legal effect as a handwritten signature.</li>
-                  <li>You intend to sign this document electronically.</li>
-                  <li>You consent to receive documents and notices electronically.</li>
-                  <li>You have the ability to access and retain electronic records.</li>
+                  {jurisdictionConfig[jurisdiction].acknowledgements.map((ack, i) => (
+                    <li key={i}>{ack}</li>
+                  ))}
                 </ul>
               </div>
             </div>
@@ -1249,18 +1248,11 @@ export default function SignPage({ params }: SignPageProps) {
               <h3 className="font-semibold">Your Rights</h3>
               <div className="text-sm text-muted-foreground space-y-2">
                 <ul className="list-disc pl-5 space-y-1">
-                  <li>
-                    <strong>Right to Paper Copy:</strong> You have the right to request a
-                    paper copy of any document. Contact the sender to request one.
-                  </li>
-                  <li>
-                    <strong>Right to Withdraw Consent:</strong> You may withdraw your consent
-                    at any time by declining to sign. Simply close this window without signing.
-                  </li>
-                  <li>
-                    <strong>No Penalty:</strong> There is no penalty for declining to sign
-                    electronically. You may request to sign via paper instead.
-                  </li>
+                  {jurisdictionConfig[jurisdiction].rights.map((right, i) => (
+                    <li key={i}>
+                      <strong>{right.title}:</strong> {right.description}
+                    </li>
+                  ))}
                 </ul>
               </div>
             </div>
