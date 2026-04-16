@@ -69,22 +69,43 @@ export async function POST(
       );
     }
 
-    // Read optional sender name override from request body
+    // Read optional sender name override and reminder config from request body
     let senderNameOverride: string | undefined;
+    let reminderEnabled = false;
+    let reminderIntervalDays = 3;
+    let reminderRepeatDays: number | null = null;
     try {
       const body = await request.json();
       if (body?.senderName && typeof body.senderName === "string") {
         senderNameOverride = body.senderName.trim() || undefined;
       }
+      if (body?.reminderEnabled === true) {
+        reminderEnabled = true;
+        if (typeof body.reminderIntervalDays === "number" && body.reminderIntervalDays >= 1) {
+          reminderIntervalDays = Math.min(Math.floor(body.reminderIntervalDays), 30);
+        }
+        if (typeof body.reminderRepeatDays === "number" && body.reminderRepeatDays >= 1) {
+          reminderRepeatDays = Math.min(Math.floor(body.reminderRepeatDays), 30);
+        }
+      }
     } catch {
       // body may be empty — that's fine
     }
+
+    // Compute first reminder timestamp
+    const nextReminderAt = reminderEnabled
+      ? new Date(Date.now() + reminderIntervalDays * 24 * 60 * 60 * 1000)
+      : null;
 
     // Update document status to pending
     const [updatedDocument] = await db
       .update(documents)
       .set({
         status: "pending",
+        reminderEnabled,
+        reminderIntervalDays,
+        reminderRepeatDays,
+        nextReminderAt,
         updatedAt: new Date(),
       })
       .where(eq(documents.id, params.id))

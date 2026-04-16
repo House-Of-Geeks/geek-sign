@@ -137,6 +137,11 @@ export const documents = pgTable("documents", {
   documentHash: text("document_hash"),
   expiresAt: timestamp("expires_at"),
   completedAt: timestamp("completed_at"),
+  // Automated reminder settings
+  reminderEnabled: boolean("reminder_enabled").default(false).notNull(),
+  reminderIntervalDays: integer("reminder_interval_days").default(3),
+  reminderRepeatDays: integer("reminder_repeat_days"),
+  nextReminderAt: timestamp("next_reminder_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

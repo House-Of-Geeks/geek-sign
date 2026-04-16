@@ -134,6 +134,10 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
   const [isSending, setIsSending] = useState(false);
   const [showSendDialog, setShowSendDialog] = useState(false);
   const [sendFromName, setSendFromName] = useState("");
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderIntervalDays, setReminderIntervalDays] = useState(3);
+  const [reminderRepeatEnabled, setReminderRepeatEnabled] = useState(false);
+  const [reminderRepeatDays, setReminderRepeatDays] = useState(3);
   const [selectedRecipientId, setSelectedRecipientId] = useState<string | null>(null);
   const [selectedFieldType, setSelectedFieldType] = useState<string>("signature");
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
@@ -530,7 +534,12 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
       const response = await fetch(`/api/documents/${params.id}/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ senderName: fromName?.trim() || undefined }),
+        body: JSON.stringify({
+          senderName: fromName?.trim() || undefined,
+          reminderEnabled,
+          reminderIntervalDays,
+          reminderRepeatDays: reminderEnabled && reminderRepeatEnabled ? reminderRepeatDays : null,
+        }),
       });
 
       const data = await response.json();
@@ -1256,7 +1265,7 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
               Review who this request will appear to come from before sending.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-5 py-4">
             <div className="space-y-2">
               <Label htmlFor="send-from-name">From name</Label>
               <Input
@@ -1269,6 +1278,66 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
               <p className="text-xs text-muted-foreground">
                 Signers will see &ldquo;<strong>{sendFromName || session?.user?.name || "Your Name"}</strong> requested your signature on &hellip;&rdquo;
               </p>
+            </div>
+
+            {/* Automated reminders */}
+            <div className="rounded-lg border p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">Automated reminders</p>
+                  <p className="text-xs text-muted-foreground">Auto-email signers who haven&apos;t signed yet</p>
+                </div>
+                <Checkbox
+                  id="reminder-enabled"
+                  checked={reminderEnabled}
+                  onCheckedChange={(v) => setReminderEnabled(v === true)}
+                />
+              </div>
+
+              {reminderEnabled && (
+                <div className="space-y-4 pt-1">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="reminder-interval" className="text-xs">First reminder after</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="reminder-interval"
+                        type="number"
+                        min={1}
+                        max={30}
+                        value={reminderIntervalDays}
+                        onChange={(e) => setReminderIntervalDays(Math.max(1, Math.min(30, parseInt(e.target.value) || 1)))}
+                        className="w-20 h-8 text-sm"
+                      />
+                      <span className="text-sm text-muted-foreground">days</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="reminder-repeat"
+                        checked={reminderRepeatEnabled}
+                        onCheckedChange={(v) => setReminderRepeatEnabled(v === true)}
+                      />
+                      <Label htmlFor="reminder-repeat" className="text-xs font-normal cursor-pointer">Repeat reminders</Label>
+                    </div>
+                    {reminderRepeatEnabled && (
+                      <div className="flex items-center gap-2 pl-6">
+                        <span className="text-sm text-muted-foreground">Every</span>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={30}
+                          value={reminderRepeatDays}
+                          onChange={(e) => setReminderRepeatDays(Math.max(1, Math.min(30, parseInt(e.target.value) || 1)))}
+                          className="w-20 h-8 text-sm"
+                        />
+                        <span className="text-sm text-muted-foreground">days until signed</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
