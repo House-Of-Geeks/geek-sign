@@ -26,6 +26,7 @@ import { ResendEmailsButton } from "@/components/documents/resend-emails-button"
 import { DownloadButton } from "@/components/documents/download-button";
 import { DeleteDocumentButton } from "@/components/documents/delete-document-button";
 import { CopySigningLinkButton } from "@/components/documents/copy-signing-link-button";
+import { EditRecipientNameButton } from "@/components/documents/edit-recipient-name-button";
 
 // Dynamically import PDF preview to avoid SSR issues
 const DocumentPreview = dynamic(
@@ -320,6 +321,14 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
+                        {document.status === "pending" && recipient.status === "pending" && (
+                          <EditRecipientNameButton
+                            documentId={document.id}
+                            recipientId={recipient.id}
+                            currentName={recipient.name}
+                            email={recipient.email}
+                          />
+                        )}
                         {document.status === "pending" && recipient.status === "pending" && recipient.signingToken && (
                           <CopySigningLinkButton signingToken={recipient.signingToken} />
                         )}
