@@ -321,7 +321,7 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
                         </div>
                       </div>
                       <div className="flex items-center gap-1">
-                        {document.status === "pending" && recipient.status === "pending" && (
+                        {document.status === "pending" && recipient.status !== "signed" && recipient.status !== "declined" && (
                           <EditRecipientNameButton
                             documentId={document.id}
                             recipientId={recipient.id}
