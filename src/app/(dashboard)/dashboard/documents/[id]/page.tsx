@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { db, documents, recipients, documentFields, auditLogs } from "@/lib/db";
-import { eq, and, desc } from "drizzle-orm";
+import { teamMembers } from "@/lib/db/schema";
+import { eq, and, desc, or, inArray } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,10 +66,27 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
     return null;
   }
 
+  // Get team IDs the user belongs to so team members can access shared documents
+  const memberships = await db
+    .select({ teamId: teamMembers.teamId })
+    .from(teamMembers)
+    .where(eq(teamMembers.userId, session.user.id));
+  const teamIds = memberships.map((m) => m.teamId);
+
   const [document] = await db
     .select()
     .from(documents)
-    .where(and(eq(documents.id, params.id), eq(documents.userId, session.user.id)))
+    .where(
+      and(
+        eq(documents.id, params.id),
+        teamIds.length > 0
+          ? or(
+              eq(documents.userId, session.user.id),
+              inArray(documents.teamId, teamIds)
+            )
+          : eq(documents.userId, session.user.id)
+      )
+    )
     .limit(1);
 
   if (!document) {
