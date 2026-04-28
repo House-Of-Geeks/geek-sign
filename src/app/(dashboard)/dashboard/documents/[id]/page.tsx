@@ -20,6 +20,7 @@ import {
   XCircle,
   Mail,
   Loader2,
+  Table2,
 } from "lucide-react";
 import { formatDate, formatDistanceToNow } from "@/lib/utils";
 import { SendDocumentWithWorkflow } from "@/components/documents/send-document-with-workflow";
@@ -136,6 +137,31 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
     }
   };
 
+  const fieldLabel = (type: string): string => {
+    if (type.startsWith("custom:")) return type.substring(7);
+    if (type.startsWith("dropdown:")) return type.split(":")[1] || "Dropdown";
+    if (type.startsWith("sender_")) return "Sender Fill";
+    const labels: Record<string, string> = {
+      signature: "Signature", initials: "Initials", date: "Date", date_auto: "Signing Date",
+      text: "Text", checkbox: "Checkbox", name: "Name", email: "Email", address: "Address",
+      title: "Title", company: "Company", firstname: "First Name", lastname: "Last Name",
+      phone: "Phone", suburb: "Suburb / City", state: "State", postcode: "Postcode",
+      country: "Country", paragraph: "Paragraph", number: "Number", postcodes: "Postcodes",
+    };
+    return labels[type] || type;
+  };
+
+  const formatFieldValue = (type: string, value: string | null): string => {
+    if (!value) return "—";
+    if (value.startsWith("data:image")) return "✓ Signed";
+    if (type === "checkbox") return value === "checked" ? "✓ Checked" : "Unchecked";
+    if (type === "postcodes") {
+      const count = value.split(/[\n,]+/).filter(Boolean).length;
+      return `${count} postcode${count !== 1 ? "s" : ""} entered`;
+    }
+    return value.length > 120 ? value.substring(0, 120) + "…" : value;
+  };
+
   const formatFileSize = (bytes: number | null) => {
     if (!bytes) return "Unknown";
     if (bytes === 0) return "0 Bytes";
@@ -231,6 +257,73 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
               )}
             </CardContent>
           </Card>
+
+          {/* Submitted Fields */}
+          {docFields.some(f => f.value) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Table2 className="h-5 w-5" />
+                  Submitted Fields
+                </CardTitle>
+                <CardDescription>Field values entered by each recipient</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {docRecipients.map((recipient) => {
+                  const recipientFields = docFields.filter(
+                    f => f.recipientId === recipient.id && f.value && !f.type.startsWith("sender_")
+                  );
+                  if (recipientFields.length === 0) return null;
+                  return (
+                    <div key={recipient.id} className="mb-6 last:mb-0">
+                      <p className="text-sm font-semibold mb-2 text-muted-foreground">
+                        {recipient.name || recipient.email}
+                        {recipient.name && <span className="font-normal ml-1">({recipient.email})</span>}
+                      </p>
+                      <div className="rounded-lg border overflow-hidden">
+                        <table className="w-full text-sm">
+                          <tbody>
+                            {recipientFields.map((field, i) => (
+                              <tr key={field.id} className={i % 2 === 0 ? "bg-muted/30" : ""}>
+                                <td className="px-4 py-2 font-medium w-1/3 text-muted-foreground whitespace-nowrap">
+                                  {fieldLabel(field.type)}
+                                </td>
+                                <td className="px-4 py-2 break-words">
+                                  {formatFieldValue(field.type, field.value)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* Sender-fill fields */}
+                {docFields.some(f => f.value && f.type.startsWith("sender_")) && (
+                  <div className="mt-4">
+                    <p className="text-sm font-semibold mb-2 text-muted-foreground">Pre-filled by sender</p>
+                    <div className="rounded-lg border overflow-hidden">
+                      <table className="w-full text-sm">
+                        <tbody>
+                          {docFields.filter(f => f.value && f.type.startsWith("sender_")).map((field, i) => (
+                            <tr key={field.id} className={i % 2 === 0 ? "bg-amber-50" : ""}>
+                              <td className="px-4 py-2 font-medium w-1/3 text-muted-foreground whitespace-nowrap">
+                                {fieldLabel(field.type)}
+                              </td>
+                              <td className="px-4 py-2 break-words">
+                                {formatFieldValue(field.type, field.value)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Activity Log */}
           <Card>
