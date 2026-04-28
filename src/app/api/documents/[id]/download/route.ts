@@ -241,6 +241,38 @@ export async function GET(
         case "title":
         case "company":
         case "address":
+        case "firstname":
+        case "lastname":
+        case "phone":
+        case "suburb":
+        case "state":
+        case "postcode":
+        case "country":
+        case "paragraph":
+        case "number":
+        case "date_auto":
+        case "sender_paragraph":
+        case "postcodes":
+          if (value) {
+            // Multi-line fields: wrap at field width
+            const lines = value.split(/\r?\n/);
+            let lineY = y + fieldHeight - 14;
+            for (const line of lines) {
+              if (lineY < y) break;
+              page.drawText(line, {
+                x: x + 5,
+                y: lineY,
+                size: 10,
+                font: helveticaFont,
+                color: rgb(0, 0, 0),
+                maxWidth: fieldWidth - 10,
+              });
+              lineY -= 13;
+            }
+          }
+          break;
+
+        default:
           if (value) {
             page.drawText(value, {
               x: x + 5,
