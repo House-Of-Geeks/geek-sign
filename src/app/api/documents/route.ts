@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { documents, teamMembers } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { canUseRichtext } from "@/lib/features";
 
 /**
  * POST /api/documents — JSON body for richtext one-off documents.
@@ -20,6 +21,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Use /api/documents/upload for PDF uploads" },
         { status: 415 }
+      );
+    }
+
+    if (!(await canUseRichtext(session.user.id))) {
+      return NextResponse.json(
+        { error: "On-platform composition is not enabled for this account" },
+        { status: 403 }
       );
     }
 

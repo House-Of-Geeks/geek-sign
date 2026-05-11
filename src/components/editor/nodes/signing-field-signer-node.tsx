@@ -20,10 +20,11 @@ import { useSigner } from "../signer-context";
  * documents render with this view in the signer context.
  */
 function SignerFieldView({ node }: NodeViewProps) {
-  const { fieldKey, fieldType, recipientRoleId, required } = node.attrs as {
+  const { fieldKey, fieldType, recipientRoleId, label, required } = node.attrs as {
     fieldKey: string;
     fieldType: SigningFieldType;
     recipientRoleId: string;
+    label: string;
     required: boolean;
   };
 
@@ -31,8 +32,7 @@ function SignerFieldView({ node }: NodeViewProps) {
     currentRecipientId,
     fieldsByKey,
     rolesById,
-    onRequestSignature,
-    onRequestDate,
+    onRequestField,
     onChangeValue,
     hasConsented,
     onConsentRequired,
@@ -49,14 +49,16 @@ function SignerFieldView({ node }: NodeViewProps) {
 
   const handleClick = () => {
     if (!isOwn) return;
+    if (fieldType === "date_auto") return; // auto-filled, no interaction
     if (!hasConsented) {
       onConsentRequired();
       return;
     }
-    if (fieldType === "signature") onRequestSignature(fieldKey, "signature");
-    else if (fieldType === "initials") onRequestSignature(fieldKey, "initials");
-    else if (fieldType === "date") onRequestDate(fieldKey);
-    else if (fieldType === "checkbox") onChangeValue(fieldKey, filled ? null : "checked");
+    if (fieldType === "checkbox") {
+      onChangeValue(fieldKey, filled ? null : "checked");
+    } else {
+      onRequestField(fieldKey);
+    }
   };
 
   // Other-recipient view: read-only chip
@@ -91,7 +93,7 @@ function SignerFieldView({ node }: NodeViewProps) {
           style={{ borderColor: color, color }}
           title={`Waiting for ${roleLabel}`}
         >
-          {fieldTypeLabel(fieldType)} — {roleLabel}
+          {label || fieldTypeLabel(fieldType)} — {roleLabel}
         </span>
       </NodeViewWrapper>
     );
@@ -146,7 +148,7 @@ function SignerFieldView({ node }: NodeViewProps) {
       <button
         type="button"
         onClick={handleClick}
-        className="inline-flex items-center gap-1.5 rounded-md border-2 px-2.5 py-1 text-xs font-medium transition-colors animate-pulse-subtle hover:opacity-90"
+        className="inline-flex items-center gap-1.5 rounded-md border-2 px-2.5 py-1 text-xs font-medium transition-colors hover:opacity-90"
         style={{
           borderColor: color,
           backgroundColor: `${color}15`,
@@ -157,7 +159,7 @@ function SignerFieldView({ node }: NodeViewProps) {
       >
         <PenLine className="h-3.5 w-3.5" />
         <span>
-          {fieldTypeLabel(fieldType)}
+          {label || fieldTypeLabel(fieldType)}
           {required && <span className="ml-0.5">*</span>}
         </span>
       </button>
@@ -180,6 +182,8 @@ export const SigningFieldSignerNode = Node.create({
       recipientRoleId: { default: "" },
       label: { default: "" },
       required: { default: true },
+      options: { default: null },
+      placeholder: { default: null },
     };
   },
 

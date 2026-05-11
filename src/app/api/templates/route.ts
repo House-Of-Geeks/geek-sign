@@ -6,6 +6,7 @@ import { eq, desc, or, inArray } from "drizzle-orm";
 import { put } from "@vercel/blob";
 import { plansConfig } from "@/config/plans";
 import type { Plan } from "@/types";
+import { canUseRichtext } from "@/lib/features";
 
 // GET all templates for the current user
 export async function GET() {
@@ -88,6 +89,12 @@ export async function POST(request: NextRequest) {
     // Branch on Content-Type: JSON for richtext composer, FormData for PDF upload
     const requestContentType = request.headers.get("content-type") ?? "";
     if (requestContentType.includes("application/json")) {
+      if (!(await canUseRichtext(session.user.id))) {
+        return NextResponse.json(
+          { error: "On-platform composition is not enabled for this account" },
+          { status: 403 }
+        );
+      }
       const body = await request.json();
       const name = (body.name as string | undefined)?.trim();
       if (!name) {

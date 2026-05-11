@@ -7,7 +7,15 @@ import Underline from "@tiptap/extension-underline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +35,11 @@ import { SigningFieldSignerNode } from "./nodes/signing-field-signer-node";
 import { VariableNode } from "./nodes/variable-node";
 import { SignerProvider, type SignerFieldState } from "./signer-context";
 import { jurisdictionConfig, type Jurisdiction } from "@/config/jurisdiction";
+import {
+  fieldTypeLabel,
+  inputFlavourFor,
+  type SigningFieldType,
+} from "./types";
 
 interface ServerField {
   id: string;
@@ -57,7 +70,42 @@ interface RichTextSignerProps {
   isFullySigned: boolean;
 }
 
-type InputModalMode = "signature" | "initials" | "date" | "text";
+interface ContentFieldMeta {
+  fieldKey: string;
+  fieldType: SigningFieldType;
+  label: string;
+  options?: string[];
+  placeholder?: string;
+}
+
+function collectContentMeta(content: unknown): Record<string, ContentFieldMeta> {
+  const out: Record<string, ContentFieldMeta> = {};
+  const walk = (node: unknown) => {
+    if (!node || typeof node !== "object") return;
+    const n = node as {
+      type?: string;
+      attrs?: Record<string, unknown>;
+      content?: unknown[];
+    };
+    if (n.type === "signingField" && n.attrs) {
+      const fieldKey = n.attrs.fieldKey as string | undefined;
+      if (fieldKey) {
+        out[fieldKey] = {
+          fieldKey,
+          fieldType: (n.attrs.fieldType as SigningFieldType) ?? "text",
+          label:
+            (n.attrs.label as string | undefined) ||
+            fieldTypeLabel((n.attrs.fieldType as SigningFieldType) ?? "text"),
+          options: n.attrs.options as string[] | undefined,
+          placeholder: n.attrs.placeholder as string | undefined,
+        };
+      }
+    }
+    if (Array.isArray(n.content)) for (const c of n.content) walk(c);
+  };
+  walk(content);
+  return out;
+}
 
 export function RichTextSigner({
   token,
@@ -74,6 +122,8 @@ export function RichTextSigner({
 }: RichTextSignerProps) {
   const { toast } = useToast();
 
+  const contentMeta = useMemo(() => collectContentMeta(content), [content]);
+
   const [fields, setFields] = useState<ServerField[]>(initialFields);
   const [hasConsented, setHasConsented] = useState(recipient.consentGiven);
   const [showConsentModal, setShowConsentModal] = useState(!recipient.consentGiven);
@@ -83,20 +133,17 @@ export function RichTextSigner({
   const [savedSignature, setSavedSignature] = useState(initialSavedSignature);
   const [savedInitials, setSavedInitials] = useState(initialSavedInitials);
 
-  // Input modal (signature/initials/date/text share one dialog)
+  // Input dialog state
   const [inputOpen, setInputOpen] = useState(false);
-  const [inputMode, setInputMode] = useState<InputModalMode>("signature");
-  const [inputFieldKey, setInputFieldKey] = useState<string | null>(null);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [saveSignatureChecked, setSaveSignatureChecked] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
-  const [completed, setCompleted] = useState(isFullySigned || recipient.consentGiven === undefined);
+  const [completed, setCompleted] = useState(isFullySigned && recipient.consentGiven);
 
-  // Build helper maps for the signer context
   const fieldsByKey = useMemo(() => {
     const map: Record<string, SignerFieldState> = {};
-    // Own fields (mutable)
     for (const f of fields) {
       if (!f.fieldKey) continue;
       map[f.fieldKey] = {
@@ -108,7 +155,6 @@ export function RichTextSigner({
         required: f.required,
       };
     }
-    // Other recipients' fields (read-only — keyed by fieldKey but with a synthetic id)
     for (const o of otherSignedFields) {
       if (!o.fieldKey || map[o.fieldKey]) continue;
       map[o.fieldKey] = {
@@ -123,7 +169,29 @@ export function RichTextSigner({
     return map;
   }, [fields, otherSignedFields, recipient.id]);
 
-  // Save progress to server every 4s when dirty
+  // Auto-fill date_auto fields with today's date on first mount
+  const autoFillRan = useRef(false);
+  useEffect(() => {
+    if (autoFillRan.current) return;
+    autoFillRan.current = true;
+    const today = new Date().toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    let touched = false;
+    setFields((prev) =>
+      prev.map((f) => {
+        if (f.type === "date_auto" && !f.value) {
+          touched = true;
+          return { ...f, value: today };
+        }
+        return f;
+      })
+    );
+    if (touched) dirtyRef.current = true;
+  }, []);
+
   const dirtyRef = useRef(false);
   useEffect(() => {
     if (!dirtyRef.current) return;
@@ -150,46 +218,39 @@ export function RichTextSigner({
     });
   };
 
-  const openInput = (
-    fieldKey: string,
-    mode: InputModalMode,
-    initial: string
-  ) => {
-    setInputFieldKey(fieldKey);
-    setInputMode(mode);
+  const requestField = (fieldKey: string) => {
+    const state = fields.find((f) => f.fieldKey === fieldKey);
+    const meta = contentMeta[fieldKey];
+    if (!state || !meta) return;
+    const flavour = inputFlavourFor(meta.fieldType);
+    if (flavour === "checkbox" || flavour === "date_auto") return;
+
+    let initial = state.value ?? "";
+    if (flavour === "date" && !initial) {
+      initial = new Date().toISOString().slice(0, 10);
+    } else if (flavour === "date" && initial) {
+      const parsed = new Date(initial);
+      if (!isNaN(parsed.getTime())) initial = parsed.toISOString().slice(0, 10);
+    }
+    setActiveKey(fieldKey);
     setInputValue(initial);
     setSaveSignatureChecked(false);
     setInputOpen(true);
   };
 
-  const requestSignature = (fieldKey: string, kind: "signature" | "initials") => {
-    const current = fields.find((f) => f.fieldKey === fieldKey)?.value ?? "";
-    openInput(fieldKey, kind, current);
-  };
-
-  const requestDate = (fieldKey: string) => {
-    const existing = fields.find((f) => f.fieldKey === fieldKey)?.value ?? "";
-    const todayISO = new Date().toISOString().slice(0, 10);
-    let iso = todayISO;
-    if (existing) {
-      const parsed = new Date(existing);
-      if (!isNaN(parsed.getTime())) iso = parsed.toISOString().slice(0, 10);
-    }
-    openInput(fieldKey, "date", iso);
-  };
-
   const applyInputValue = async () => {
-    if (!inputFieldKey) return;
+    if (!activeKey) return;
+    const meta = contentMeta[activeKey];
+    if (!meta) return;
+    const flavour = inputFlavourFor(meta.fieldType);
     const trimmed = inputValue.trim();
     if (!trimmed) {
-      toast({
-        title: "Please enter a value",
-        variant: "destructive",
-      });
+      toast({ title: "Please enter a value", variant: "destructive" });
       return;
     }
+
     let stored = trimmed;
-    if (inputMode === "date") {
+    if (flavour === "date") {
       const d = new Date(trimmed);
       stored = isNaN(d.getTime())
         ? trimmed
@@ -199,20 +260,18 @@ export function RichTextSigner({
             day: "numeric",
           });
     }
-    setFieldValue(inputFieldKey, stored);
+    setFieldValue(activeKey, stored);
 
-    if ((inputMode === "signature" || inputMode === "initials") && saveSignatureChecked) {
+    if ((flavour === "signature" || flavour === "initials") && saveSignatureChecked) {
       try {
         await fetch(`/api/sign/${token}/save-signature`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
-            inputMode === "signature"
-              ? { signature: trimmed }
-              : { initials: trimmed }
+            flavour === "signature" ? { signature: trimmed } : { initials: trimmed }
           ),
         });
-        if (inputMode === "signature") setSavedSignature(trimmed);
+        if (flavour === "signature") setSavedSignature(trimmed);
         else setSavedInitials(trimmed);
       } catch {
         /* non-fatal */
@@ -221,7 +280,7 @@ export function RichTextSigner({
 
     setInputOpen(false);
     setInputValue("");
-    setInputFieldKey(null);
+    setActiveKey(null);
   };
 
   const handleConsentSubmit = async () => {
@@ -270,9 +329,7 @@ export function RichTextSigner({
         }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to submit");
-      }
+      if (!res.ok) throw new Error(data.error || "Failed to submit");
       setCompleted(true);
       toast({
         title: "Signed!",
@@ -309,7 +366,9 @@ export function RichTextSigner({
   });
 
   const totalRequired = fields.filter((f) => f.required).length;
-  const filledRequired = fields.filter((f) => f.required && f.value && f.value.trim()).length;
+  const filledRequired = fields.filter(
+    (f) => f.required && f.value && f.value.trim()
+  ).length;
 
   if (completed) {
     return (
@@ -326,6 +385,9 @@ export function RichTextSigner({
 
   const jurisdictionLabel = jurisdictionConfig[jurisdiction]?.consentTitle ?? "";
   const jurisdictionDesc = jurisdictionConfig[jurisdiction]?.consentIntro ?? "";
+
+  const activeMeta = activeKey ? contentMeta[activeKey] : null;
+  const activeFlavour = activeMeta ? inputFlavourFor(activeMeta.fieldType) : "text";
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -366,8 +428,7 @@ export function RichTextSigner({
               currentRecipientId: recipient.id,
               fieldsByKey,
               rolesById,
-              onRequestSignature: requestSignature,
-              onRequestDate: requestDate,
+              onRequestField: requestField,
               onChangeValue: setFieldValue,
               hasConsented,
               onConsentRequired: () => setShowConsentModal(true),
@@ -417,52 +478,47 @@ export function RichTextSigner({
         </DialogContent>
       </Dialog>
 
-      {/* Input dialog (signature/initials/date/text) */}
+      {/* Input dialog — flavour-aware */}
       <Dialog
         open={inputOpen}
         onOpenChange={(open) => {
           setInputOpen(open);
           if (!open) {
             setInputValue("");
-            setInputFieldKey(null);
+            setActiveKey(null);
           }
         }}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {inputMode === "signature" && "Add your signature"}
-              {inputMode === "initials" && "Add your initials"}
-              {inputMode === "date" && "Pick a date"}
-              {inputMode === "text" && "Enter text"}
-            </DialogTitle>
-            {(inputMode === "signature" || inputMode === "initials") && (
+            <DialogTitle>{activeMeta?.label || "Enter value"}</DialogTitle>
+            {(activeFlavour === "signature" || activeFlavour === "initials") && (
               <DialogDescription>
-                Type your {inputMode === "signature" ? "full name" : "initials"}{" "}
-                below. This will be legally binding.
+                Type your {activeFlavour === "signature" ? "full name" : "initials"} below.
+                This will be legally binding.
               </DialogDescription>
             )}
           </DialogHeader>
 
           <div className="space-y-4 py-2">
-            {(inputMode === "signature" || inputMode === "initials") && (
+            {(activeFlavour === "signature" || activeFlavour === "initials") && (
               <>
-                {(inputMode === "signature" ? savedSignature : savedInitials) &&
+                {(activeFlavour === "signature" ? savedSignature : savedInitials) &&
                   !inputValue && (
                     <Button
                       variant="outline"
                       className="w-full"
                       onClick={() =>
                         setInputValue(
-                          (inputMode === "signature"
+                          (activeFlavour === "signature"
                             ? savedSignature
                             : savedInitials) ?? ""
                         )
                       }
                     >
-                      Use saved {inputMode}:{" "}
+                      Use saved {activeFlavour}:{" "}
                       <span className="ml-2 italic" style={{ fontFamily: "cursive" }}>
-                        {inputMode === "signature" ? savedSignature : savedInitials}
+                        {activeFlavour === "signature" ? savedSignature : savedInitials}
                       </span>
                     </Button>
                   )}
@@ -471,7 +527,7 @@ export function RichTextSigner({
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   placeholder={
-                    inputMode === "signature"
+                    activeFlavour === "signature"
                       ? "Type your full name"
                       : "Type your initials"
                   }
@@ -501,7 +557,7 @@ export function RichTextSigner({
               </>
             )}
 
-            {inputMode === "date" && (
+            {activeFlavour === "date" && (
               <Input
                 type="date"
                 autoFocus
@@ -510,13 +566,60 @@ export function RichTextSigner({
               />
             )}
 
-            {inputMode === "text" && (
+            {(activeFlavour === "text" || activeFlavour === "email" ||
+              activeFlavour === "tel" || activeFlavour === "number") && (
               <Input
                 autoFocus
+                type={
+                  activeFlavour === "email"
+                    ? "email"
+                    : activeFlavour === "tel"
+                    ? "tel"
+                    : activeFlavour === "number"
+                    ? "number"
+                    : "text"
+                }
+                inputMode={
+                  activeFlavour === "email"
+                    ? "email"
+                    : activeFlavour === "tel"
+                    ? "tel"
+                    : activeFlavour === "number"
+                    ? "decimal"
+                    : "text"
+                }
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder="Enter value"
+                placeholder={activeMeta?.placeholder ?? `Enter ${activeMeta?.label?.toLowerCase() || "value"}`}
               />
+            )}
+
+            {activeFlavour === "textarea" && (
+              <Textarea
+                autoFocus
+                rows={4}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder={activeMeta?.placeholder ?? `Enter ${activeMeta?.label?.toLowerCase() || "value"}`}
+              />
+            )}
+
+            {activeFlavour === "dropdown" && (
+              <Select
+                value={inputValue}
+                onValueChange={(v) => setInputValue(v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(activeMeta?.options ?? []).map((opt) => (
+                    <SelectItem key={opt} value={opt}>
+                      {opt}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
           </div>
 

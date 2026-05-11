@@ -5,6 +5,7 @@ import { documents, recipients, documentFields } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { documentAccessClause, getUserTeamIds } from "@/lib/db/team-access";
 import { collectSigningFields, remapFieldRoles } from "@/lib/richtext/content-walk";
+import { canUseRichtext } from "@/lib/features";
 
 interface RoleInput {
   id: string;
@@ -29,6 +30,13 @@ export async function POST(
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!(await canUseRichtext(session.user.id))) {
+      return NextResponse.json(
+        { error: "On-platform composition is not enabled for this account" },
+        { status: 403 }
+      );
     }
 
     const teamIds = await getUserTeamIds(session.user.id);

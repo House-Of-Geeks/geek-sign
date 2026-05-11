@@ -1,6 +1,7 @@
-"use client";
-
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
+import { canUseRichtext } from "@/lib/features";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,7 +12,15 @@ import {
 } from "@/components/ui/card";
 import { ArrowLeft, ArrowRight, FileText, Upload } from "lucide-react";
 
-export default function NewTemplateChooserPage() {
+export default async function NewTemplateChooserPage() {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  // Non-super-admins skip the chooser and go straight to PDF upload.
+  if (!(await canUseRichtext(session.user.id))) {
+    redirect("/dashboard/templates/new/pdf");
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-8">
       <div className="flex items-center gap-4">

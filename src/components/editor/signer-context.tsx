@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
-import type { SigningFieldType } from "./types";
 
 export interface SignerFieldState {
   id: string;
@@ -16,8 +15,9 @@ export interface SignerContextValue {
   currentRecipientId: string;
   fieldsByKey: Record<string, SignerFieldState>;
   rolesById: Record<string, { label: string; color: string }>;
-  onRequestSignature: (fieldKey: string, kind: "signature" | "initials") => void;
-  onRequestDate: (fieldKey: string) => void;
+  /** Request the signer modal for this field — the parent decides which UI to show */
+  onRequestField: (fieldKey: string) => void;
+  /** Direct value change (used for checkbox toggles) */
   onChangeValue: (fieldKey: string, value: string | null) => void;
   hasConsented: boolean;
   onConsentRequired: () => void;
@@ -45,12 +45,4 @@ export function useSigner(): SignerContextValue {
 
 export function isOwnField(state: SignerFieldState | undefined, currentRecipientId: string) {
   return !!state && state.recipientId === currentRecipientId;
-}
-
-// Map richtext fieldType -> server field.type so the inline node can read the right shape
-export function normaliseFieldType(t: string): SigningFieldType {
-  if (t === "signature" || t === "initials" || t === "date" || t === "text" || t === "checkbox") {
-    return t;
-  }
-  return "text";
 }

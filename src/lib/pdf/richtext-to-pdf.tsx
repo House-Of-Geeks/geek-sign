@@ -132,22 +132,25 @@ function InlineText({ node }: InlineProps) {
   );
 }
 
+const CURSIVE_TYPES = new Set(["signature", "initials"]);
+
 function SigningFieldInline({ node, lookup }: InlineProps) {
   const fieldKey = node.attrs?.fieldKey as string | undefined;
   const fieldType = (node.attrs?.fieldType as string | undefined) ?? "text";
+  const label = (node.attrs?.label as string | undefined) ?? fieldType;
   if (!fieldKey) return null;
   const entry = lookup.byKey[fieldKey];
   const value = entry?.value;
 
   if (!value) {
-    return <Text style={styles.unsignedField}>[unsigned {fieldType}]</Text>;
+    return <Text style={styles.unsignedField}>[{label}]</Text>;
   }
 
   if (fieldType === "checkbox") {
-    return <Text style={styles.signedField}>{value === "checked" ? "[x]" : "[ ]"}</Text>;
+    return <Text style={styles.signedField}>{value === "checked" ? "☑" : "☐"}</Text>;
   }
 
-  if (fieldType === "signature" || fieldType === "initials") {
+  if (CURSIVE_TYPES.has(fieldType)) {
     return <Text style={styles.signedFieldCursive}>{value}</Text>;
   }
 

@@ -18,6 +18,8 @@ declare module "@tiptap/core" {
         recipientRoleId: string;
         label: string;
         required?: boolean;
+        options?: string[];
+        placeholder?: string;
       }) => ReturnType;
     };
   }
@@ -90,6 +92,8 @@ export const SigningFieldNode = Node.create({
       recipientRoleId: { default: "" },
       label: { default: "" },
       required: { default: true },
+      options: { default: null },
+      placeholder: { default: null },
     };
   },
 
