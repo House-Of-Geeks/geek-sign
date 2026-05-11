@@ -74,6 +74,59 @@ export async function GET(
       .limit(1);
     const jurisdiction = (documentOwner?.jurisdiction ?? "AU") as Jurisdiction;
 
+    // Richtext branch — render the composed agreement to PDF
+    if (document.contentType === "richtext") {
+      const { renderRichtextDocumentToPdf } = await import("@/lib/pdf/richtext-to-pdf");
+      const lookup = {
+        byKey: fields.reduce<Record<string, { value: string | null; recipientName: string | null }>>(
+          (acc, f) => {
+            if (f.fieldKey) {
+              const r = documentRecipients.find((rr) => rr.id === f.recipientId);
+              acc[f.fieldKey] = { value: f.value, recipientName: r?.name ?? null };
+            }
+            return acc;
+          },
+          {}
+        ),
+      };
+
+      const pdfBuffer = await renderRichtextDocumentToPdf({
+        title: document.title,
+        content: document.content as Parameters<typeof renderRichtextDocumentToPdf>[0]["content"],
+        lookup,
+        recipients: documentRecipients.map((r) => ({
+          name: r.name,
+          email: r.email,
+          signedAt: r.signedAt,
+          ipAddress: r.ipAddress,
+        })),
+        jurisdiction,
+        documentId: document.id,
+        completedAt: document.completedAt,
+      });
+
+      await db.insert(auditLogs).values({
+        documentId: document.id,
+        recipientId: recipient.id,
+        action: "document_downloaded",
+        details: { downloadedBy: recipient.email, format: "richtext-pdf" },
+      });
+
+      return new NextResponse(new Uint8Array(pdfBuffer), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="${document.title.replace(/[^a-z0-9\-_\. ]/gi, "_")}.pdf"`,
+        },
+      });
+    }
+
+    if (!document.fileUrl) {
+      return NextResponse.json(
+        { error: "This document has no PDF source" },
+        { status: 400 }
+      );
+    }
+
     // Fetch the original PDF
     const pdfResponse = await fetch(document.fileUrl);
     if (!pdfResponse.ok) {
@@ -100,6 +153,14 @@ export async function GET(
 
     // Process each field and add to PDF
     for (const field of fields) {
+      if (
+        field.xPosition === null ||
+        field.yPosition === null ||
+        field.width === null ||
+        field.height === null
+      ) {
+        continue;
+      }
       const pageIndex = (field.page || 1) - 1;
       if (pageIndex >= pages.length || pageIndex < 0) continue;
 
@@ -108,10 +169,10 @@ export async function GET(
 
       // Field positions are stored as pixel values, convert to PDF coordinates
       // The PDF coordinate system has origin at bottom-left
-      const x = field.xPosition;
-      const y = pageHeight - field.yPosition - field.height;
-      const fieldWidth = field.width;
-      const fieldHeight = field.height;
+      const x: number = field.xPosition;
+      const y: number = pageHeight - field.yPosition - field.height;
+      const fieldWidth: number = field.width;
+      const fieldHeight: number = field.height;
 
       const value = field.value || "";
 

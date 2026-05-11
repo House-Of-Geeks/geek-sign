@@ -69,13 +69,29 @@ interface TemplateFieldInfo {
   type?: string;
 }
 
+interface VariableDef {
+  key: string;
+  label: string;
+  type?: string;
+  defaultValue?: string;
+}
+
+interface RecipientRoleDef {
+  id: string;
+  label: string;
+  color?: string;
+}
+
 interface Template {
   id: string;
   name: string;
   description: string | null;
+  contentType?: string;
   fileUrl: string | null;
   fields: TemplateFieldInfo[] | null;
   recipientSlots: RecipientSlot[] | null;
+  variableSchema?: VariableDef[] | null;
+  recipientRoles?: RecipientRoleDef[] | null;
   createdAt: string;
 }
 
@@ -113,6 +129,10 @@ export default function TemplatesPage() {
   const [useTemplateSlots, setUseTemplateSlots] = useState<Array<{ email: string; name: string }>>([{ email: "", name: "" }]);
   const [templateSenderFields, setTemplateSenderFields] = useState<TemplateFieldInfo[]>([]);
   const [senderFieldValues, setSenderFieldValues] = useState<Record<string, string>>({});
+  // Richtext template variables prompted at "Use Template" time
+  const [templateVariables, setTemplateVariables] = useState<VariableDef[]>([]);
+  const [variableValues, setVariableValues] = useState<Record<string, string>>({});
+  const [useTemplateContentType, setUseTemplateContentType] = useState<string>("pdf");
   const [teamMembersList, setTeamMembersList] = useState<TeamMember[]>([]);
   const [selectedSenderUserId, setSelectedSenderUserId] = useState<string>("");
   const [senderDisplayName, setSenderDisplayName] = useState<string>("");
@@ -224,6 +244,7 @@ export default function TemplatesPage() {
           recipientEmails,
           customMessage: useTemplateData.customMessage || undefined,
           senderFieldValues: Object.keys(senderFieldValues).length > 0 ? senderFieldValues : undefined,
+          variables: Object.keys(variableValues).length > 0 ? variableValues : undefined,
           senderUserId: selectedSenderUserId || undefined,
           senderDisplayName: senderDisplayName.trim() || undefined,
         }),
@@ -234,9 +255,15 @@ export default function TemplatesPage() {
       if (response.ok) {
         toast({
           title: "Document created",
-          description: "Redirecting to document editor...",
+          description: "Redirecting…",
         });
-        router.push(`/dashboard/documents/${data.document.id}/edit`);
+        // Richtext docs have no coordinate editor — go to the document detail
+        // page where the sender can review and send.
+        if (useTemplateContentType === "richtext") {
+          router.push(`/dashboard/documents/${data.document.id}`);
+        } else {
+          router.push(`/dashboard/documents/${data.document.id}/edit`);
+        }
       } else {
         toast({
           title: "Error",
@@ -259,6 +286,9 @@ export default function TemplatesPage() {
       setSenderDisplayName("");
       setTemplateSenderFields([]);
       setSenderFieldValues({});
+      setTemplateVariables([]);
+      setVariableValues({});
+      setUseTemplateContentType("pdf");
       setSelectedSenderUserId("");
     }
   };
@@ -360,31 +390,64 @@ export default function TemplatesPage() {
                       onClick={() => {
                         setUseTemplateId(template.id);
                         setUseTemplateData({ title: template.name, customMessage: "" });
-                        // Compute slot count from fields and recipientSlots (exclude sender-fill fields)
-                        const slots = template.recipientSlots || [];
-                        const fields = template.fields || [];
-                        const regularFields = fields.filter((f: TemplateFieldInfo) => (f.recipientIndex ?? 0) >= 0);
-                        const maxFieldIndex = regularFields.reduce((max: number, f: TemplateFieldInfo) => Math.max(max, f.recipientIndex ?? 0), 0);
-                        const numSlots = Math.max(1, slots.length, regularFields.length > 0 ? maxFieldIndex + 1 : 0);
-                        setUseTemplateSlots(
-                          Array.from({ length: numSlots }).map((_, i) => ({
-                            email: slots[i]?.preAssignedEmail || "",
-                            name: slots[i]?.preAssignedName || "",
-                          }))
-                        );
-                        // Detect sender-fill fields
-                        const senderFields = fields.filter((f: TemplateFieldInfo) => f.recipientIndex === -1);
-                        setTemplateSenderFields(senderFields);
-                        const initVals: Record<string, string> = {};
-                        senderFields.forEach((f: TemplateFieldInfo) => { if (f.id) initVals[f.id] = ""; });
-                        setSenderFieldValues(initVals);
+                        const isRichtext = template.contentType === "richtext";
+                        setUseTemplateContentType(template.contentType || "pdf");
+
+                        if (isRichtext) {
+                          // Richtext: one slot per recipient role
+                          const roles = template.recipientRoles || [];
+                          const slotCount = Math.max(1, roles.length);
+                          setUseTemplateSlots(
+                            Array.from({ length: slotCount }).map(() => ({
+                              email: "",
+                              name: "",
+                            }))
+                          );
+                          // No sender-fill fields concept for richtext
+                          setTemplateSenderFields([]);
+                          setSenderFieldValues({});
+                          // Surface variables for prompting
+                          const vars = template.variableSchema || [];
+                          setTemplateVariables(vars);
+                          const initVarVals: Record<string, string> = {};
+                          vars.forEach((v) => {
+                            initVarVals[v.key] = v.defaultValue ?? "";
+                          });
+                          setVariableValues(initVarVals);
+                        } else {
+                          // PDF: compute slot count from fields and recipientSlots
+                          const slots = template.recipientSlots || [];
+                          const fields = template.fields || [];
+                          const regularFields = fields.filter((f: TemplateFieldInfo) => (f.recipientIndex ?? 0) >= 0);
+                          const maxFieldIndex = regularFields.reduce((max: number, f: TemplateFieldInfo) => Math.max(max, f.recipientIndex ?? 0), 0);
+                          const numSlots = Math.max(1, slots.length, regularFields.length > 0 ? maxFieldIndex + 1 : 0);
+                          setUseTemplateSlots(
+                            Array.from({ length: numSlots }).map((_, i) => ({
+                              email: slots[i]?.preAssignedEmail || "",
+                              name: slots[i]?.preAssignedName || "",
+                            }))
+                          );
+                          const senderFields = fields.filter((f: TemplateFieldInfo) => f.recipientIndex === -1);
+                          setTemplateSenderFields(senderFields);
+                          const initVals: Record<string, string> = {};
+                          senderFields.forEach((f: TemplateFieldInfo) => { if (f.id) initVals[f.id] = ""; });
+                          setSenderFieldValues(initVals);
+                          setTemplateVariables([]);
+                          setVariableValues({});
+                        }
                       }}
                     >
                       <Copy className="mr-2 h-4 w-4" />
                       Use Template
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href={`/dashboard/templates/${template.id}/edit`}>
+                      <Link
+                        href={
+                          template.contentType === "richtext"
+                            ? `/dashboard/templates/${template.id}/compose`
+                            : `/dashboard/templates/${template.id}/edit`
+                        }
+                      >
                         <Edit className="mr-2 h-4 w-4" />
                         Edit
                       </Link>
@@ -404,11 +467,15 @@ export default function TemplatesPage() {
                 <p className="text-sm text-muted-foreground line-clamp-2">
                   {template.description || "No description provided"}
                 </p>
-                {template.fileUrl && (
+                {template.contentType === "richtext" ? (
+                  <Badge variant="secondary" className="mt-2">
+                    Composed on platform
+                  </Badge>
+                ) : template.fileUrl ? (
                   <Badge variant="secondary" className="mt-2">
                     PDF attached
                   </Badge>
-                )}
+                ) : null}
               </CardContent>
             </Card>
           ))}
@@ -555,6 +622,30 @@ export default function TemplatesPage() {
                 </div>
               ))}
             </div>
+            {templateVariables.length > 0 && (
+              <div className="space-y-3 rounded-lg border bg-muted/40 p-3">
+                <div>
+                  <Label className="text-sm font-medium">Variables</Label>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    These values are merged into the document before sending.
+                  </p>
+                </div>
+                {templateVariables.map((v) => (
+                  <div key={v.key} className="space-y-1">
+                    <Label className="text-xs">{v.label}</Label>
+                    <Input
+                      type={v.type === "date" ? "date" : v.type === "number" ? "number" : "text"}
+                      value={variableValues[v.key] ?? ""}
+                      onChange={(e) =>
+                        setVariableValues((prev) => ({ ...prev, [v.key]: e.target.value }))
+                      }
+                      placeholder={`Enter ${v.label.toLowerCase()}`}
+                      className="bg-white"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
             {templateSenderFields.length > 0 && (
               <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
                 <div>

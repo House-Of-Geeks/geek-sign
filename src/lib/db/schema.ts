@@ -126,8 +126,16 @@ export const documents = pgTable("documents", {
     .references(() => users.id, { onDelete: "cascade" }),
   teamId: uuid("team_id").references(() => teams.id),
   title: text("title").notNull(),
-  fileUrl: text("file_url").notNull(),
-  fileName: text("file_name").notNull(),
+  // 'pdf' for uploaded files; 'richtext' for on-platform composed agreements
+  contentType: text("content_type").default("pdf").notNull(),
+  // Tiptap JSON for richtext documents (null for pdf)
+  content: jsonb("content"),
+  // Sender-provided values for {{variables}} merged in from a template
+  variables: jsonb("variables"),
+  // Cached server-rendered PDF for richtext documents (filled after first download/completion)
+  renderedPdfUrl: text("rendered_pdf_url"),
+  fileUrl: text("file_url"),
+  fileName: text("file_name"),
   fileSize: integer("file_size"),
   pageCount: integer("page_count"),
   status: text("status").default("draft").notNull(),
@@ -177,11 +185,14 @@ export const documentFields = pgTable("document_fields", {
     .notNull()
     .references(() => recipients.id, { onDelete: "cascade" }),
   type: text("type").notNull(),
+  // Stable identifier referenced by inline Tiptap field nodes in richtext docs
+  fieldKey: text("field_key"),
   page: integer("page").default(1).notNull(),
-  xPosition: integer("x_position").notNull(),
-  yPosition: integer("y_position").notNull(),
-  width: integer("width").notNull(),
-  height: integer("height").notNull(),
+  // Coordinate fields populated only for PDF-backed documents
+  xPosition: integer("x_position"),
+  yPosition: integer("y_position"),
+  width: integer("width"),
+  height: integer("height"),
   required: boolean("required").default(true).notNull(),
   value: text("value"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -195,9 +206,17 @@ export const templates = pgTable("templates", {
   teamId: uuid("team_id").references(() => teams.id),
   name: text("name").notNull(),
   description: text("description"),
+  // 'pdf' for upload-based templates; 'richtext' for on-platform composed templates
+  contentType: text("content_type").default("pdf").notNull(),
   fileUrl: text("file_url"),
   fields: jsonb("fields"),
   recipientSlots: jsonb("recipient_slots"),
+  // Tiptap JSON for richtext templates (null for pdf)
+  content: jsonb("content"),
+  // [{ key, label, type, default }] — sender-fill variables prompted at "use template"
+  variableSchema: jsonb("variable_schema"),
+  // [{ id, label, color }] — named signer roles referenced by inline field nodes
+  recipientRoles: jsonb("recipient_roles"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

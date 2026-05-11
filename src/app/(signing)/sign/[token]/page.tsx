@@ -52,6 +52,14 @@ const PdfDocument = dynamic(
   { ssr: false }
 );
 
+// Richtext signer is heavy (Tiptap) — also load client-side only
+const RichTextSigner = dynamic(
+  () => import("@/components/editor/richtext-signer").then((mod) => mod.RichTextSigner),
+  { ssr: false }
+);
+
+const ROLE_PALETTE = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#3b82f6", "#a855f7", "#ec4899"];
+
 interface SignPageProps {
   params: { token: string };
 }
@@ -59,6 +67,7 @@ interface SignPageProps {
 interface Field {
   id: string;
   type: string;
+  fieldKey?: string | null;
   xPosition: number;
   yPosition: number;
   width: number;
@@ -73,9 +82,23 @@ interface DocumentData {
   title: string;
   fileUrl: string | null;
   status: string;
+  contentType?: string;
+  content?: unknown;
   isFullySigned?: boolean;
   totalRecipients?: number;
   signedCount?: number;
+}
+
+interface OtherSignedField {
+  fieldKey: string | null;
+  value: string | null;
+}
+
+interface RecipientSummary {
+  id: string;
+  name: string | null;
+  email: string;
+  orderIndex: number;
 }
 
 interface RecipientData {
@@ -107,6 +130,8 @@ export default function SignPage({ params }: SignPageProps) {
   const [consentCheckbox, setConsentCheckbox] = useState(false);
   const [isRecordingConsent, setIsRecordingConsent] = useState(false);
   const [jurisdiction, setJurisdiction] = useState<Jurisdiction>("AU");
+  const [otherSignedFields, setOtherSignedFields] = useState<OtherSignedField[]>([]);
+  const [allRecipients, setAllRecipients] = useState<RecipientSummary[]>([]);
 
   // Text field modal state
 
@@ -173,6 +198,8 @@ export default function SignPage({ params }: SignPageProps) {
         setSavedSignature(data.savedSignature ?? null);
         setSavedInitials(data.savedInitials ?? null);
         if (data.jurisdiction) setJurisdiction(data.jurisdiction as Jurisdiction);
+        if (Array.isArray(data.otherSignedFields)) setOtherSignedFields(data.otherSignedFields);
+        if (Array.isArray(data.allRecipients)) setAllRecipients(data.allRecipients);
 
         // Check if consent was already given
         if (data.recipient.consentGiven) {
@@ -669,6 +696,44 @@ export default function SignPage({ params }: SignPageProps) {
           <p className="text-muted-foreground">Loading document...</p>
         </div>
       </div>
+    );
+  }
+
+  if (!isLoading && !error && document?.contentType === "richtext" && recipient) {
+    const rolesById: Record<string, { label: string; color: string }> = {};
+    allRecipients.forEach((r, i) => {
+      rolesById[r.id] = {
+        label: r.name || r.email,
+        color: ROLE_PALETTE[i % ROLE_PALETTE.length],
+      };
+    });
+    return (
+      <RichTextSigner
+        token={params.token}
+        documentId={document.id}
+        documentTitle={document.title}
+        content={document.content}
+        rolesById={rolesById}
+        recipient={{
+          id: recipient.id,
+          name: recipient.name,
+          email: recipient.email,
+          consentGiven: !!recipient.consentGiven,
+        }}
+        fields={fields.map((f) => ({
+          id: f.id,
+          type: f.type,
+          fieldKey: (f as Field & { fieldKey?: string | null }).fieldKey ?? null,
+          page: f.page,
+          value: f.value,
+          required: f.required,
+        }))}
+        otherSignedFields={otherSignedFields}
+        savedSignature={savedSignature}
+        savedInitials={savedInitials}
+        jurisdiction={jurisdiction}
+        isFullySigned={!!document.isFullySigned}
+      />
     );
   }
 

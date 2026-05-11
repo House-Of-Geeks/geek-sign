@@ -31,6 +31,11 @@ import { CopySigningLinkButton } from "@/components/documents/copy-signing-link-
 import { EditRecipientNameButton } from "@/components/documents/edit-recipient-name-button";
 
 // Dynamically import PDF preview to avoid SSR issues
+const ReadOnlyRenderer = dynamic(
+  () => import("@/components/editor/read-only-renderer").then((mod) => mod.ReadOnlyRenderer),
+  { ssr: false }
+);
+
 const DocumentPreview = dynamic(
   () => import("@/components/pdf/document-preview").then((mod) => mod.DocumentPreview),
   {
@@ -162,6 +167,60 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
     return value.length > 120 ? value.substring(0, 120) + "…" : value;
   };
 
+  // For richtext docs: roles keyed by recipient id, coloured by orderIndex
+  const ROLE_PALETTE = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#3b82f6", "#a855f7", "#ec4899"];
+  const richtextRoles = [...docRecipients]
+    .sort((a, b) => a.orderIndex - b.orderIndex)
+    .map((r, i) => ({
+      id: r.id,
+      label: r.name || r.email,
+      color: ROLE_PALETTE[i % ROLE_PALETTE.length],
+    }));
+
+  // For richtext: replace filled signingField nodes inline with their value
+  // so the preview shows the signed document (chip-style for unsigned)
+  type TiptapNode = {
+    type: string;
+    attrs?: Record<string, unknown>;
+    content?: TiptapNode[];
+    text?: string;
+    marks?: unknown[];
+  };
+  const substituteFilledFields = (node: unknown, fieldsByKey: Record<string, string>): unknown => {
+    if (!node || typeof node !== "object") return node;
+    const n = node as TiptapNode;
+    if (n.type === "signingField" && n.attrs) {
+      const key = n.attrs.fieldKey as string | undefined;
+      const fieldType = (n.attrs.fieldType as string | undefined) ?? "text";
+      const value = key ? fieldsByKey[key] : undefined;
+      if (value) {
+        if (fieldType === "checkbox") {
+          return { type: "text", text: value === "checked" ? "☑ " : "☐ " };
+        }
+        // Render filled value as text (italic mark for signature/initials)
+        const isCursive = fieldType === "signature" || fieldType === "initials";
+        return {
+          type: "text",
+          text: value,
+          marks: isCursive ? [{ type: "italic" }] : undefined,
+        };
+      }
+      return n;
+    }
+    if (Array.isArray(n.content)) {
+      return { ...n, content: n.content.map((c) => substituteFilledFields(c, fieldsByKey)) };
+    }
+    return n;
+  };
+  const richtextFieldsByKey: Record<string, string> = {};
+  for (const f of docFields) {
+    if (f.fieldKey && f.value) richtextFieldsByKey[f.fieldKey] = f.value;
+  }
+  const richtextPreviewContent =
+    document.contentType === "richtext"
+      ? substituteFilledFields(document.content, richtextFieldsByKey)
+      : null;
+
   const formatFileSize = (bytes: number | null) => {
     if (!bytes) return "Unknown";
     if (bytes === 0) return "0 Bytes";
@@ -232,25 +291,46 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
           <Card>
             <CardHeader>
               <CardTitle>Document Preview</CardTitle>
-              {(document.status === "completed" || document.status === "pending") && docFields.some(f => f.value) && (
-                <CardDescription>Showing signed fields as overlays</CardDescription>
+              {document.contentType === "richtext" ? (
+                docFields.some(f => f.value) && (
+                  <CardDescription>Signed values shown inline; unsigned fields remain as chips</CardDescription>
+                )
+              ) : (
+                (document.status === "completed" || document.status === "pending") && docFields.some(f => f.value) && (
+                  <CardDescription>Showing signed fields as overlays</CardDescription>
+                )
               )}
             </CardHeader>
             <CardContent>
-              {(document.status === "completed" || document.status === "pending") && docFields.some(f => f.value) ? (
+              {document.contentType === "richtext" ? (
+                <div className="rounded-md border bg-white">
+                  <ReadOnlyRenderer
+                    content={richtextPreviewContent}
+                    roles={richtextRoles}
+                  />
+                </div>
+              ) : (document.status === "completed" || document.status === "pending") && docFields.some(f => f.value) ? (
                 <SignedDocumentPreview
                   fileUrl={document.fileUrl}
-                  fields={docFields.map(f => ({
-                    id: f.id,
-                    type: f.type,
-                    page: f.page,
-                    xPosition: f.xPosition,
-                    yPosition: f.yPosition,
-                    width: f.width,
-                    height: f.height,
-                    value: f.value,
-                    recipientId: f.recipientId,
-                  }))}
+                  fields={docFields
+                    .filter(
+                      (f) =>
+                        f.xPosition !== null &&
+                        f.yPosition !== null &&
+                        f.width !== null &&
+                        f.height !== null
+                    )
+                    .map((f) => ({
+                      id: f.id,
+                      type: f.type,
+                      page: f.page,
+                      xPosition: f.xPosition as number,
+                      yPosition: f.yPosition as number,
+                      width: f.width as number,
+                      height: f.height as number,
+                      value: f.value,
+                      recipientId: f.recipientId,
+                    }))}
                 />
               ) : (
                 <DocumentPreview fileUrl={document.fileUrl} />

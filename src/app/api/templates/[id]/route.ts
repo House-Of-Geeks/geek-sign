@@ -152,6 +152,67 @@ export async function PUT(
   }
 }
 
+// PATCH partial update (JSON) — used by the on-platform composer for autosave
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const teamIds = await getTeamIds(session.user.id);
+    const [existingTemplate] = await db
+      .select()
+      .from(templates)
+      .where(
+        and(
+          eq(templates.id, id),
+          teamIds.length > 0
+            ? or(eq(templates.userId, session.user.id), inArray(templates.teamId, teamIds))
+            : eq(templates.userId, session.user.id)
+        )
+      )
+      .limit(1);
+
+    if (!existingTemplate) {
+      return NextResponse.json({ error: "Template not found" }, { status: 404 });
+    }
+
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const updates: Partial<typeof templates.$inferInsert> = {
+      updatedAt: new Date(),
+    };
+
+    if (typeof body.name === "string") updates.name = body.name.trim() || "Untitled template";
+    if ("description" in body) updates.description = body.description || null;
+    if ("content" in body) updates.content = body.content ?? null;
+    if ("variableSchema" in body) updates.variableSchema = body.variableSchema ?? null;
+    if ("recipientRoles" in body) updates.recipientRoles = body.recipientRoles ?? null;
+
+    const [updatedTemplate] = await db
+      .update(templates)
+      .set(updates)
+      .where(eq(templates.id, id))
+      .returning();
+
+    return NextResponse.json(updatedTemplate);
+  } catch (error) {
+    console.error("Error patching template:", error);
+    return NextResponse.json(
+      { error: "Failed to update template" },
+      { status: 500 }
+    );
+  }
+}
+
 // DELETE template
 export async function DELETE(
   request: NextRequest,

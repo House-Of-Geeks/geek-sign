@@ -85,6 +85,50 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Branch on Content-Type: JSON for richtext composer, FormData for PDF upload
+    const requestContentType = request.headers.get("content-type") ?? "";
+    if (requestContentType.includes("application/json")) {
+      const body = await request.json();
+      const name = (body.name as string | undefined)?.trim();
+      if (!name) {
+        return NextResponse.json(
+          { error: "Template name is required" },
+          { status: 400 }
+        );
+      }
+      const richContentType = (body.contentType as string | undefined) ?? "richtext";
+      if (richContentType !== "richtext") {
+        return NextResponse.json(
+          { error: "Unsupported contentType for JSON create" },
+          { status: 400 }
+        );
+      }
+
+      const [membershipForInsert] = await db
+        .select({ teamId: teamMembers.teamId })
+        .from(teamMembers)
+        .where(eq(teamMembers.userId, session.user.id))
+        .limit(1);
+
+      const [newTemplate] = await db
+        .insert(templates)
+        .values({
+          userId: session.user.id,
+          teamId: membershipForInsert?.teamId ?? null,
+          name,
+          description: (body.description as string | null) || null,
+          contentType: "richtext",
+          content: body.content ?? null,
+          variableSchema: body.variableSchema ?? null,
+          recipientRoles: body.recipientRoles ?? null,
+          fileUrl: null,
+          fields: null,
+        })
+        .returning();
+
+      return NextResponse.json(newTemplate, { status: 201 });
+    }
+
     const formData = await request.formData();
     const name = formData.get("name") as string;
     const description = formData.get("description") as string;

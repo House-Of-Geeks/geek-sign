@@ -131,10 +131,18 @@ export async function GET(
       .where(eq(users.id, document.userId))
       .limit(1);
 
+    // Recipient roles (richtext only) for colored signer chips in the signer view
+    const allFields = await db
+      .select()
+      .from(documentFields)
+      .where(eq(documentFields.documentId, document.id));
+
     return NextResponse.json({
       document: {
         id: document.id,
         title: document.title,
+        contentType: document.contentType,
+        content: document.content,
         fileUrl: document.fileUrl,
         status: document.status,
         isFullySigned: allSigned,
@@ -154,6 +162,7 @@ export async function GET(
       fields: fields.map((f) => ({
         id: f.id,
         type: f.type,
+        fieldKey: f.fieldKey,
         xPosition: f.xPosition,
         yPosition: f.yPosition,
         width: f.width,
@@ -162,6 +171,31 @@ export async function GET(
         value: f.value,
         required: f.required,
       })),
+      // For richtext docs: include other recipients' completed values so the signer
+      // sees what's already been filled in by previous parties
+      otherSignedFields:
+        document.contentType === "richtext"
+          ? allFields
+              .filter((f) => f.recipientId !== recipient.id && f.value)
+              .map((f) => ({
+                fieldKey: f.fieldKey,
+                value: f.value,
+              }))
+          : [],
+      // For richtext docs: ordered recipient list so the signer view can color each
+      // signer's fields consistently (we color by index, not by template role).
+      allRecipients:
+        document.contentType === "richtext"
+          ? allRecipients
+              .slice()
+              .sort((a, b) => a.orderIndex - b.orderIndex)
+              .map((r) => ({
+                id: r.id,
+                name: r.name,
+                email: r.email,
+                orderIndex: r.orderIndex,
+              }))
+          : [],
     });
   } catch (error) {
     console.error("Get signing data error:", error);

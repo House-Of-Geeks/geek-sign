@@ -8,6 +8,13 @@
       "when": 1764905528266,
       "tag": "0000_add-super-admin",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776341669230,
+      "tag": "0001_add-workflows",
+      "breakpoints": true
     }
   ]
 }
