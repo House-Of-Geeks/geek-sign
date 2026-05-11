@@ -134,6 +134,8 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
   const [isSending, setIsSending] = useState(false);
   const [showSendDialog, setShowSendDialog] = useState(false);
   const [sendFromName, setSendFromName] = useState("");
+  const [teamMembersList, setTeamMembersList] = useState<Array<{ userId: string; user: { name: string | null; email: string } }>>([]);
+  const [selectedSenderUserId, setSelectedSenderUserId] = useState<string>("");
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderIntervalDays, setReminderIntervalDays] = useState(3);
   const [reminderRepeatEnabled, setReminderRepeatEnabled] = useState(false);
@@ -194,6 +196,10 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
 
     if (session?.user) {
       fetchPlanLimits();
+      fetch("/api/team/members")
+        .then((r) => (r.ok ? r.json() : { members: [] }))
+        .then((data) => setTeamMembersList(data.members || []))
+        .catch(() => {});
     }
   }, [session]);
 
@@ -536,6 +542,7 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           senderName: fromName?.trim() || undefined,
+          senderUserId: selectedSenderUserId || undefined,
           reminderEnabled,
           reminderIntervalDays,
           reminderRepeatDays: reminderEnabled && reminderRepeatEnabled ? reminderRepeatDays : null,
@@ -1279,6 +1286,39 @@ export default function DocumentEditorPage({ params }: EditorPageProps) {
                 Signers will see &ldquo;<strong>{sendFromName || session?.user?.name || "Your Name"}</strong> requested your signature on &hellip;&rdquo;
               </p>
             </div>
+
+            {teamMembersList.length > 0 && (
+              <div className="space-y-2">
+                <Label htmlFor="send-as-account">Send as account</Label>
+                <select
+                  id="send-as-account"
+                  className="w-full border rounded-md px-3 py-2 text-sm bg-background"
+                  value={selectedSenderUserId}
+                  onChange={(e) => {
+                    const userId = e.target.value;
+                    setSelectedSenderUserId(userId);
+                    if (userId) {
+                      const member = teamMembersList.find((m) => m.userId === userId);
+                      if (member && !sendFromName.trim()) {
+                        setSendFromName(member.user.name || member.user.email);
+                      }
+                    }
+                  }}
+                >
+                  <option value="">Me ({session?.user?.name || session?.user?.email})</option>
+                  {teamMembersList
+                    .filter((m) => m.userId !== session?.user?.id)
+                    .map((m) => (
+                      <option key={m.userId} value={m.userId}>
+                        {m.user.name ? `${m.user.name} (${m.user.email})` : m.user.email}
+                      </option>
+                    ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  The document will be assigned to this account and the email will come from them.
+                </p>
+              </div>
+            )}
 
             {/* Automated reminders */}
             <div className="rounded-lg border p-4 space-y-4">
