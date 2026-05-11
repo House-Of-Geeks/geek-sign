@@ -59,7 +59,15 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { title, recipientEmails, customMessage, senderFieldValues, senderUserId, senderDisplayName } = body;
+    const {
+      title,
+      recipientEmails,
+      customMessage,
+      senderFieldValues,
+      senderUserId,
+      senderDisplayName,
+      variables,
+    } = body;
 
     if (!title) {
       return NextResponse.json(
@@ -75,11 +83,15 @@ export async function POST(
       );
     }
 
-    // If template has a file, copy it for the new document
-    let fileUrl = template.fileUrl;
-    let fileName = template.name + ".pdf";
+    const isRichtext = template.contentType === "richtext";
 
-    if (template.fileUrl) {
+    let fileUrl: string | null = template.fileUrl ?? null;
+    let fileName: string | null = template.name + ".pdf";
+
+    if (isRichtext) {
+      fileUrl = null;
+      fileName = null;
+    } else if (template.fileUrl) {
       // Fetch the template file and re-upload to create a copy
       const response = await fetch(template.fileUrl);
       if (response.ok) {
@@ -98,11 +110,14 @@ export async function POST(
       );
     }
 
-    // Validate senderUserId is a team member if provided
+    // Validate senderUserId is a team member if provided.
+    // When delegating, also attach the document to a shared team so the
+    // session user retains access via the team-access clause.
     let documentUserId = session.user.id;
+    let documentTeamId: string | null = null;
     if (senderUserId && senderUserId !== session.user.id) {
       const senderMembership = await db
-        .select({ userId: teamMembers.userId })
+        .select({ teamId: teamMembers.teamId })
         .from(teamMembers)
         .where(
           and(
@@ -113,7 +128,19 @@ export async function POST(
         .limit(1);
       if (senderMembership.length > 0) {
         documentUserId = senderUserId;
+        documentTeamId =
+          template.teamId && teamIds.includes(template.teamId)
+            ? template.teamId
+            : senderMembership[0].teamId;
       }
+    }
+
+    // For richtext: substitute variable nodes with their provided values
+    // (the role remap below requires recipients to exist, so we do it after).
+    let documentContent: unknown = null;
+    if (isRichtext) {
+      const variableMap = (variables ?? {}) as Record<string, string>;
+      documentContent = substituteVariables(template.content, variableMap);
     }
 
     // Create the document
@@ -121,9 +148,13 @@ export async function POST(
       .insert(documents)
       .values({
         userId: documentUserId,
+        teamId: documentTeamId,
         title,
-        fileUrl: fileUrl!,
-        fileName,
+        contentType: isRichtext ? "richtext" : "pdf",
+        content: documentContent,
+        variables: isRichtext ? (variables ?? null) : null,
+        fileUrl: fileUrl,
+        fileName: fileName,
         status: "draft",
         customMessage: customMessage || null,
         senderDisplayName: senderDisplayName || null,
@@ -152,8 +183,41 @@ export async function POST(
       });
     }
 
-    // Copy template fields to document fields
-    if (template.fields && Array.isArray(template.fields)) {
+    if (isRichtext) {
+      // Map template role UUIDs -> recipient indexes -> recipient DB ids.
+      const roles = (template.recipientRoles as Array<{ id: string }> | null) ?? [];
+      const roleIdToRecipientId = new Map<string, string>();
+      roles.forEach((r, i) => {
+        const recipient = createdRecipients[i] || createdRecipients[0];
+        if (recipient) roleIdToRecipientId.set(r.id, recipient.id);
+      });
+
+      // Rewrite signingField nodes so recipientRoleId now references the
+      // document's recipient UUID (not the template role UUID).
+      documentContent = remapFieldRoles(documentContent, roleIdToRecipientId);
+
+      // Now persist a document_fields row per inline signingField.
+      const inlineFields = collectSigningFields(documentContent);
+      for (const f of inlineFields) {
+        const recipientId =
+          roleIdToRecipientId.get(f.recipientRoleId) ??
+          (f.recipientRoleId || createdRecipients[0]?.id);
+        if (!recipientId) continue;
+        await db.insert(documentFields).values({
+          documentId: newDocument.id,
+          recipientId,
+          type: f.fieldType,
+          fieldKey: f.fieldKey,
+          required: f.required ?? true,
+        });
+      }
+
+      // Persist the remapped content
+      await db
+        .update(documents)
+        .set({ content: documentContent })
+        .where(eq(documents.id, newDocument.id));
+    } else if (template.fields && Array.isArray(template.fields)) {
       const templateFields = template.fields as TemplateField[];
 
       for (const field of templateFields) {
@@ -210,4 +274,102 @@ export async function POST(
       { status: 500 }
     );
   }
+}
+
+interface TiptapNode {
+  type: string;
+  attrs?: Record<string, unknown>;
+  content?: TiptapNode[];
+  text?: string;
+  marks?: unknown[];
+}
+
+interface CollectedField {
+  fieldKey: string;
+  fieldType: string;
+  recipientRoleId: string;
+  required: boolean;
+}
+
+function collectSigningFields(content: unknown): CollectedField[] {
+  const out: CollectedField[] = [];
+  const walk = (node: TiptapNode | null | undefined) => {
+    if (!node || typeof node !== "object") return;
+    if (node.type === "signingField" && node.attrs) {
+      const attrs = node.attrs as Record<string, unknown>;
+      const fieldKey = typeof attrs.fieldKey === "string" ? attrs.fieldKey : null;
+      const fieldType = typeof attrs.fieldType === "string" ? attrs.fieldType : "text";
+      const recipientRoleId =
+        typeof attrs.recipientRoleId === "string" ? attrs.recipientRoleId : "";
+      const required = attrs.required !== false;
+      if (fieldKey) out.push({ fieldKey, fieldType, recipientRoleId, required });
+    }
+    if (Array.isArray(node.content)) {
+      for (const child of node.content) walk(child);
+    }
+  };
+  walk(content as TiptapNode | null);
+  return out;
+}
+
+function remapFieldRoles(
+  content: unknown,
+  roleIdToRecipientId: Map<string, string>
+): unknown {
+  if (!content || typeof content !== "object") return content;
+  const node = content as TiptapNode;
+
+  if (node.type === "signingField" && node.attrs) {
+    const roleId = node.attrs.recipientRoleId as string | undefined;
+    if (roleId && roleIdToRecipientId.has(roleId)) {
+      return {
+        ...node,
+        attrs: {
+          ...node.attrs,
+          recipientRoleId: roleIdToRecipientId.get(roleId),
+        },
+      };
+    }
+    return node;
+  }
+
+  if (Array.isArray(node.content)) {
+    return {
+      ...node,
+      content: node.content
+        .map((child) => remapFieldRoles(child, roleIdToRecipientId))
+        .filter(Boolean),
+    };
+  }
+
+  return node;
+}
+
+function substituteVariables(
+  content: unknown,
+  variables: Record<string, string>
+): unknown {
+  if (!content || typeof content !== "object") return content;
+  const node = content as TiptapNode;
+
+  if (node.type === "variable" && node.attrs) {
+    const key = node.attrs.variableKey as string | undefined;
+    if (key && key in variables) {
+      // Replace the variable atom with a plain text node of the same value
+      return { type: "text", text: variables[key] };
+    }
+    // No value provided — leave the placeholder visible
+    return node;
+  }
+
+  if (Array.isArray(node.content)) {
+    return {
+      ...node,
+      content: node.content
+        .map((child) => substituteVariables(child, variables))
+        .filter(Boolean),
+    };
+  }
+
+  return node;
 }

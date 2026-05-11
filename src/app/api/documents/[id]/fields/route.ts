@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { documents, documentFields, recipients } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
+import { documentAccessClause, getUserTeamIds } from "@/lib/db/team-access";
 
 export async function GET(
   request: NextRequest,
@@ -15,13 +16,12 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify document ownership
+    // Verify document access (owner or team member)
+    const teamIds = await getUserTeamIds(session.user.id);
     const [document] = await db
       .select()
       .from(documents)
-      .where(
-        and(eq(documents.id, params.id), eq(documents.userId, session.user.id))
-      );
+      .where(documentAccessClause(params.id, session.user.id, teamIds));
 
     if (!document) {
       return NextResponse.json({ error: "Document not found" }, { status: 404 });
@@ -53,13 +53,12 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify document ownership
+    // Verify document access (owner or team member)
+    const teamIds = await getUserTeamIds(session.user.id);
     const [document] = await db
       .select()
       .from(documents)
-      .where(
-        and(eq(documents.id, params.id), eq(documents.userId, session.user.id))
-      );
+      .where(documentAccessClause(params.id, session.user.id, teamIds));
 
     if (!document) {
       return NextResponse.json({ error: "Document not found" }, { status: 404 });

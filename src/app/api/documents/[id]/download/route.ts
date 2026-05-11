@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { documents, recipients, documentFields, auditLogs, users } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import { documentAccessClause, getUserTeamIds } from "@/lib/db/team-access";
 import { jurisdictionConfig, type Jurisdiction } from "@/config/jurisdiction";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 
@@ -18,13 +19,12 @@ export async function GET(
 
     const { id } = await params;
 
-    // Get the document
+    // Get the document (owner or team member)
+    const teamIds = await getUserTeamIds(session.user.id);
     const [document] = await db
       .select()
       .from(documents)
-      .where(
-        and(eq(documents.id, id), eq(documents.userId, session.user.id))
-      )
+      .where(documentAccessClause(id, session.user.id, teamIds))
       .limit(1);
 
     if (!document) {
@@ -54,9 +54,62 @@ export async function GET(
     const [documentOwner] = await db
       .select({ jurisdiction: users.jurisdiction })
       .from(users)
-      .where(eq(users.id, session.user.id))
+      .where(eq(users.id, document.userId))
       .limit(1);
     const jurisdiction = (documentOwner?.jurisdiction ?? "AU") as Jurisdiction;
+
+    // Richtext branch: render the composed agreement to PDF via @react-pdf/renderer
+    if (document.contentType === "richtext") {
+      const { renderRichtextDocumentToPdf } = await import("@/lib/pdf/richtext-to-pdf");
+      const lookup = {
+        byKey: fields.reduce<Record<string, { value: string | null; recipientName: string | null }>>(
+          (acc, f) => {
+            if (f.fieldKey) {
+              const r = documentRecipients.find((rr) => rr.id === f.recipientId);
+              acc[f.fieldKey] = { value: f.value, recipientName: r?.name ?? null };
+            }
+            return acc;
+          },
+          {}
+        ),
+      };
+
+      const pdfBuffer = await renderRichtextDocumentToPdf({
+        title: document.title,
+        content: document.content as Parameters<typeof renderRichtextDocumentToPdf>[0]["content"],
+        lookup,
+        recipients: documentRecipients.map((r) => ({
+          name: r.name,
+          email: r.email,
+          signedAt: r.signedAt,
+          ipAddress: r.ipAddress,
+        })),
+        jurisdiction,
+        documentId: document.id,
+        completedAt: document.completedAt,
+      });
+
+      // Audit
+      await db.insert(auditLogs).values({
+        documentId: document.id,
+        action: "document_downloaded",
+        details: { downloadedBy: session.user.id, format: "richtext-pdf" },
+      });
+
+      return new NextResponse(new Uint8Array(pdfBuffer), {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="${document.title.replace(/[^a-z0-9\-_\. ]/gi, "_")}.pdf"`,
+        },
+      });
+    }
+
+    if (!document.fileUrl) {
+      return NextResponse.json(
+        { error: "This document has no PDF source" },
+        { status: 400 }
+      );
+    }
 
     // Fetch the original PDF
     const pdfResponse = await fetch(document.fileUrl);
@@ -90,6 +143,14 @@ export async function GET(
 
     // Process each field and add to PDF
     for (const field of fields) {
+      if (
+        field.xPosition === null ||
+        field.yPosition === null ||
+        field.width === null ||
+        field.height === null
+      ) {
+        continue;
+      }
       const pageIndex = (field.page || 1) - 1;
       if (pageIndex >= pages.length || pageIndex < 0) continue;
 
@@ -98,10 +159,10 @@ export async function GET(
 
       // Field positions are stored as pixel values from react-pdf at scale=1
       // PDF coordinate system has origin at bottom-left
-      const x = field.xPosition;
-      const y = pageHeight - field.yPosition - field.height;
-      const fieldWidth = field.width;
-      const fieldHeight = field.height;
+      const x: number = field.xPosition;
+      const y: number = pageHeight - field.yPosition - field.height;
+      const fieldWidth: number = field.width;
+      const fieldHeight: number = field.height;
 
       console.log("Rendering field at PDF coords: x=", x, "y=", y, "pageHeight=", pageHeight, "pageWidth=", pageWidth);
 

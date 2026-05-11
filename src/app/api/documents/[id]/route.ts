@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { documents, recipients, documentFields } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import { documentAccessClause, getUserTeamIds } from "@/lib/db/team-access";
 
 export async function GET(
   request: NextRequest,
@@ -15,12 +16,11 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const teamIds = await getUserTeamIds(session.user.id);
     const [document] = await db
       .select()
       .from(documents)
-      .where(
-        and(eq(documents.id, params.id), eq(documents.userId, session.user.id))
-      );
+      .where(documentAccessClause(params.id, session.user.id, teamIds));
 
     if (!document) {
       return NextResponse.json({ error: "Document not found" }, { status: 404 });
@@ -67,6 +67,7 @@ export async function PATCH(
     const body = await request.json();
     const { title, status } = body;
 
+    const teamIds = await getUserTeamIds(session.user.id);
     const [document] = await db
       .update(documents)
       .set({
@@ -74,9 +75,7 @@ export async function PATCH(
         ...(status && { status }),
         updatedAt: new Date(),
       })
-      .where(
-        and(eq(documents.id, params.id), eq(documents.userId, session.user.id))
-      )
+      .where(documentAccessClause(params.id, session.user.id, teamIds))
       .returning();
 
     if (!document) {
@@ -104,11 +103,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const teamIds = await getUserTeamIds(session.user.id);
     const [document] = await db
       .delete(documents)
-      .where(
-        and(eq(documents.id, params.id), eq(documents.userId, session.user.id))
-      )
+      .where(documentAccessClause(params.id, session.user.id, teamIds))
       .returning();
 
     if (!document) {
