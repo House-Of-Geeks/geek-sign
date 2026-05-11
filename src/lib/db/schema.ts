@@ -132,6 +132,9 @@ export const documents = pgTable("documents", {
   content: jsonb("content"),
   // Sender-provided values for {{variables}} merged in from a template
   variables: jsonb("variables"),
+  // For richtext one-off docs: provisional signer roles entered during
+  // composition. Replaced with real recipients during the finalise step.
+  recipientRoles: jsonb("recipient_roles"),
   // Cached server-rendered PDF for richtext documents (filled after first download/completion)
   renderedPdfUrl: text("rendered_pdf_url"),
   fileUrl: text("file_url"),

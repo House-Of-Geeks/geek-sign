@@ -24,8 +24,8 @@ const navigation = [
     icon: LayoutDashboard,
   },
   {
-    name: "Upload",
-    href: "/dashboard/upload",
+    name: "New Document",
+    href: "/dashboard/documents/new",
     icon: Upload,
   },
   {

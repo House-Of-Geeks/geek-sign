@@ -67,14 +67,20 @@ export async function PATCH(
     const body = await request.json();
     const { title, status } = body;
 
+    const updates: Partial<typeof documents.$inferInsert> = {
+      updatedAt: new Date(),
+    };
+    if (title) updates.title = title;
+    if (status) updates.status = status;
+    // Richtext composer autosave
+    if ("content" in body) updates.content = body.content ?? null;
+    if ("recipientRoles" in body) updates.recipientRoles = body.recipientRoles ?? null;
+    if ("variables" in body) updates.variables = body.variables ?? null;
+
     const teamIds = await getUserTeamIds(session.user.id);
     const [document] = await db
       .update(documents)
-      .set({
-        ...(title && { title }),
-        ...(status && { status }),
-        updatedAt: new Date(),
-      })
+      .set(updates)
       .where(documentAccessClause(params.id, session.user.id, teamIds))
       .returning();
 

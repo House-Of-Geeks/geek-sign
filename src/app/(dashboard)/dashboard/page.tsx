@@ -96,9 +96,9 @@ export default async function DashboardPage() {
           </p>
         </div>
         <Button asChild>
-          <Link href="/dashboard/upload">
+          <Link href="/dashboard/documents/new">
             <Upload className="mr-2 h-4 w-4" />
-            Upload Document
+            New Document
           </Link>
         </Button>
       </div>
@@ -131,9 +131,9 @@ export default async function DashboardPage() {
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Button variant="outline" className="h-auto flex-col gap-2 p-4" asChild>
-              <Link href="/dashboard/upload">
+              <Link href="/dashboard/documents/new">
                 <Upload className="h-6 w-6" />
-                <span>Upload Document</span>
+                <span>New Document</span>
               </Link>
             </Button>
             <Button variant="outline" className="h-auto flex-col gap-2 p-4" asChild>
@@ -203,12 +203,12 @@ export default async function DashboardPage() {
               </div>
               <h3 className="font-semibold">No documents yet</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Upload your first document to get started
+                Create your first document to get started
               </p>
               <Button asChild>
-                <Link href="/dashboard/upload">
+                <Link href="/dashboard/documents/new">
                   <Upload className="mr-2 h-4 w-4" />
-                  Upload Document
+                  New Document
                 </Link>
               </Button>
             </div>

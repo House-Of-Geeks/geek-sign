@@ -4,6 +4,11 @@ import { db } from "@/lib/db";
 import { templates, documents, recipients, documentFields, teamMembers } from "@/lib/db/schema";
 import { eq, and, or, inArray } from "drizzle-orm";
 import { put } from "@vercel/blob";
+import {
+  collectSigningFields,
+  remapFieldRoles,
+  substituteVariables,
+} from "@/lib/richtext/content-walk";
 
 async function getTeamIds(userId: string): Promise<string[]> {
   const memberships = await db
@@ -276,100 +281,3 @@ export async function POST(
   }
 }
 
-interface TiptapNode {
-  type: string;
-  attrs?: Record<string, unknown>;
-  content?: TiptapNode[];
-  text?: string;
-  marks?: unknown[];
-}
-
-interface CollectedField {
-  fieldKey: string;
-  fieldType: string;
-  recipientRoleId: string;
-  required: boolean;
-}
-
-function collectSigningFields(content: unknown): CollectedField[] {
-  const out: CollectedField[] = [];
-  const walk = (node: TiptapNode | null | undefined) => {
-    if (!node || typeof node !== "object") return;
-    if (node.type === "signingField" && node.attrs) {
-      const attrs = node.attrs as Record<string, unknown>;
-      const fieldKey = typeof attrs.fieldKey === "string" ? attrs.fieldKey : null;
-      const fieldType = typeof attrs.fieldType === "string" ? attrs.fieldType : "text";
-      const recipientRoleId =
-        typeof attrs.recipientRoleId === "string" ? attrs.recipientRoleId : "";
-      const required = attrs.required !== false;
-      if (fieldKey) out.push({ fieldKey, fieldType, recipientRoleId, required });
-    }
-    if (Array.isArray(node.content)) {
-      for (const child of node.content) walk(child);
-    }
-  };
-  walk(content as TiptapNode | null);
-  return out;
-}
-
-function remapFieldRoles(
-  content: unknown,
-  roleIdToRecipientId: Map<string, string>
-): unknown {
-  if (!content || typeof content !== "object") return content;
-  const node = content as TiptapNode;
-
-  if (node.type === "signingField" && node.attrs) {
-    const roleId = node.attrs.recipientRoleId as string | undefined;
-    if (roleId && roleIdToRecipientId.has(roleId)) {
-      return {
-        ...node,
-        attrs: {
-          ...node.attrs,
-          recipientRoleId: roleIdToRecipientId.get(roleId),
-        },
-      };
-    }
-    return node;
-  }
-
-  if (Array.isArray(node.content)) {
-    return {
-      ...node,
-      content: node.content
-        .map((child) => remapFieldRoles(child, roleIdToRecipientId))
-        .filter(Boolean),
-    };
-  }
-
-  return node;
-}
-
-function substituteVariables(
-  content: unknown,
-  variables: Record<string, string>
-): unknown {
-  if (!content || typeof content !== "object") return content;
-  const node = content as TiptapNode;
-
-  if (node.type === "variable" && node.attrs) {
-    const key = node.attrs.variableKey as string | undefined;
-    if (key && key in variables) {
-      // Replace the variable atom with a plain text node of the same value
-      return { type: "text", text: variables[key] };
-    }
-    // No value provided — leave the placeholder visible
-    return node;
-  }
-
-  if (Array.isArray(node.content)) {
-    return {
-      ...node,
-      content: node.content
-        .map((child) => substituteVariables(child, variables))
-        .filter(Boolean),
-    };
-  }
-
-  return node;
-}
