@@ -42,7 +42,9 @@ export function collectSigningFields(content: unknown): CollectedField[] {
 
 /**
  * Replace variable nodes with text nodes containing the resolved value.
- * Unfilled variables are left in place.
+ * Variables with empty / whitespace-only values are LEFT IN PLACE — replacing
+ * them with empty text nodes would crash the Tiptap renderer ("Empty text
+ * nodes are not allowed"). Same for unfilled variables.
  */
 export function substituteVariables(
   content: unknown,
@@ -53,8 +55,9 @@ export function substituteVariables(
 
   if (node.type === "variable" && node.attrs) {
     const key = node.attrs.variableKey as string | undefined;
-    if (key && key in variables) {
-      return { type: "text", text: variables[key] };
+    const value = key ? variables[key] : undefined;
+    if (typeof value === "string" && value.trim() !== "") {
+      return { type: "text", text: value };
     }
     return node;
   }
@@ -68,6 +71,32 @@ export function substituteVariables(
     };
   }
 
+  return node;
+}
+
+/**
+ * Walk content and drop any empty text nodes (text === "" or whitespace-only).
+ * Tiptap throws "Empty text nodes are not allowed" on load if it encounters
+ * one, which blanks the entire editor. Use this on the read path as a
+ * defensive sanitiser for content that may have been written by older
+ * versions of the substitution code.
+ */
+export function stripEmptyTextNodes(content: unknown): unknown {
+  if (!content || typeof content !== "object") return content;
+  const node = content as TiptapNode;
+  if (Array.isArray(node.content)) {
+    const cleaned = node.content
+      .map((child) => stripEmptyTextNodes(child))
+      .filter((child) => {
+        if (!child || typeof child !== "object") return true;
+        const c = child as TiptapNode;
+        if (c.type === "text") {
+          return typeof c.text === "string" && c.text.length > 0;
+        }
+        return true;
+      });
+    return { ...node, content: cleaned };
+  }
   return node;
 }
 

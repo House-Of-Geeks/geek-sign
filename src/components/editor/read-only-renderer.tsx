@@ -2,11 +2,11 @@
 
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Underline from "@tiptap/extension-underline";
 import { SigningFieldNode } from "./nodes/signing-field-node";
 import { VariableNode } from "./nodes/variable-node";
 import { RolesProvider } from "./roles-context";
 import type { RecipientRole } from "./types";
+import { stripEmptyTextNodes } from "@/lib/richtext/content-walk";
 
 interface ReadOnlyRendererProps {
   content: unknown;
@@ -27,11 +27,12 @@ export function ReadOnlyRenderer({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
-      Underline,
       SigningFieldNode,
       VariableNode,
     ],
-    content: (content as object | undefined) ?? { type: "doc", content: [] },
+    content:
+      (stripEmptyTextNodes(content) as object | undefined) ??
+      { type: "doc", content: [] },
     editable: false,
     immediatelyRender: false,
     editorProps: {

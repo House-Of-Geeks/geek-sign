@@ -3,7 +3,6 @@
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
-import Underline from "@tiptap/extension-underline";
 import { useEffect } from "react";
 import { SigningFieldNode } from "./nodes/signing-field-node";
 import { VariableNode } from "./nodes/variable-node";
@@ -58,7 +57,6 @@ export function TiptapEditor({
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
       }),
-      Underline,
       Placeholder.configure({ placeholder }),
       SigningFieldNode,
       VariableNode,

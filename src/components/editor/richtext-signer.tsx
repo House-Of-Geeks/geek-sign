@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Underline from "@tiptap/extension-underline";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +34,7 @@ import { SigningFieldSignerNode } from "./nodes/signing-field-signer-node";
 import { VariableNode } from "./nodes/variable-node";
 import { SignerProvider, type SignerFieldState } from "./signer-context";
 import { jurisdictionConfig, type Jurisdiction } from "@/config/jurisdiction";
+import { stripEmptyTextNodes } from "@/lib/richtext/content-walk";
 import {
   fieldTypeLabel,
   inputFlavourFor,
@@ -351,11 +351,12 @@ export function RichTextSigner({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
-      Underline,
       SigningFieldSignerNode,
       VariableNode,
     ],
-    content: (content as object | undefined) ?? { type: "doc", content: [] },
+    content:
+      (stripEmptyTextNodes(content) as object | undefined) ??
+      { type: "doc", content: [] },
     editable: false,
     immediatelyRender: false,
     editorProps: {
