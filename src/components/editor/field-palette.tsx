@@ -114,7 +114,9 @@ export function FieldPalette({ editor, roles }: FieldPaletteProps) {
 
     let label = fieldTypeLabel(fieldType);
     let options: string[] | undefined;
-    let required = true;
+    // Only signature fields are required by default — keeps signers from
+    // being blocked by every form field. Users can still flip per-field.
+    let required = fieldType === "signature";
 
     // Configurable types: prompt for the details before inserting.
     if (fieldType === "dropdown") {
@@ -133,9 +135,6 @@ export function FieldPalette({ editor, roles }: FieldPaletteProps) {
       const customLabel = window.prompt("Custom field label", "Custom field");
       if (!customLabel) return;
       label = customLabel.trim();
-    } else if (fieldType === "date_auto") {
-      // Auto-filled at signing — no signer interaction
-      required = false;
     }
 
     editor

@@ -259,7 +259,13 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
             {document.status === "draft" && (
               <>
                 <Button variant="outline" asChild>
-                  <Link href={`/dashboard/documents/${document.id}/edit`}>
+                  <Link
+                    href={
+                      document.contentType === "richtext"
+                        ? `/dashboard/documents/${document.id}/compose`
+                        : `/dashboard/documents/${document.id}/edit`
+                    }
+                  >
                     <Edit className="mr-2 h-4 w-4" />
                     Edit
                   </Link>
@@ -482,7 +488,13 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
               <CardTitle>Recipients</CardTitle>
               {document.status === "draft" && (
                 <Button variant="outline" size="sm" asChild>
-                  <Link href={`/dashboard/documents/${document.id}/edit`}>
+                  <Link
+                    href={
+                      document.contentType === "richtext"
+                        ? `/dashboard/documents/${document.id}/compose`
+                        : `/dashboard/documents/${document.id}/edit`
+                    }
+                  >
                     Edit
                   </Link>
                 </Button>
@@ -534,7 +546,13 @@ export default async function DocumentPage({ params }: DocumentPageProps) {
                   <p className="text-sm text-muted-foreground">No recipients added</p>
                   {document.status === "draft" && (
                     <Button variant="link" size="sm" asChild className="mt-2">
-                      <Link href={`/dashboard/documents/${document.id}/edit`}>
+                      <Link
+                        href={
+                          document.contentType === "richtext"
+                            ? `/dashboard/documents/${document.id}/compose`
+                            : `/dashboard/documents/${document.id}/edit`
+                        }
+                      >
                         Add recipients
                       </Link>
                     </Button>

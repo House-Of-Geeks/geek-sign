@@ -49,6 +49,10 @@ export default function ComposeDocumentPage() {
   const [editor, setEditor] = useState<Editor | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [preparing, setPreparing] = useState(false);
+  // True once real recipient rows exist (template "Use" already created them,
+  // or one-off "Prepare to send" was already pressed). In that mode we hide
+  // signer editing and the Prepare CTA.
+  const [isFinalized, setIsFinalized] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,11 +87,47 @@ export default function ComposeDocumentPage() {
 
         setTitle(doc.title);
         setContent(doc.content ?? null);
-        setSigners(
-          doc.recipientRoles && doc.recipientRoles.length > 0
-            ? doc.recipientRoles
-            : [DEFAULT_SIGNER]
-        );
+
+        const apiRecipients = Array.isArray(data.recipients) ? data.recipients : [];
+        if (apiRecipients.length > 0) {
+          // Doc has been finalised — hydrate signers from real recipients.
+          // recipient.id is what inline signingField nodes reference in the
+          // content (after the use-template remap), so we key signers on it.
+          const palette = ROLE_COLORS;
+          setSigners(
+            apiRecipients
+              .slice()
+              .sort(
+                (a: { orderIndex?: number }, b: { orderIndex?: number }) =>
+                  (a.orderIndex ?? 0) - (b.orderIndex ?? 0)
+              )
+              .map(
+                (
+                  r: {
+                    id: string;
+                    email: string;
+                    name: string | null;
+                    orderIndex?: number;
+                  },
+                  i: number
+                ) => ({
+                  id: r.id,
+                  label: r.name || r.email,
+                  color: palette[i % palette.length],
+                  email: r.email,
+                  name: r.name ?? "",
+                })
+              )
+          );
+          setIsFinalized(true);
+        } else {
+          setSigners(
+            doc.recipientRoles && doc.recipientRoles.length > 0
+              ? doc.recipientRoles
+              : [DEFAULT_SIGNER]
+          );
+          setIsFinalized(false);
+        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -114,14 +154,17 @@ export default function ComposeDocumentPage() {
 
   const save = async () => {
     try {
+      const body: Record<string, unknown> = {
+        title: title.trim() || "Untitled document",
+        content,
+      };
+      // Only write recipientRoles in the pre-finalise mode; once finalised
+      // the source of truth for recipients is the recipients table.
+      if (!isFinalized) body.recipientRoles = signers;
       const res = await fetch(`/api/documents/${documentId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: title.trim() || "Untitled document",
-          content,
-          recipientRoles: signers,
-        }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error("Save failed");
       setSaveState("saved");
@@ -219,17 +262,23 @@ export default function ComposeDocumentPage() {
           <span className="text-sm text-muted-foreground inline-flex items-center gap-1.5">
             <SaveIndicator state={saveState} />
           </span>
-          <Button onClick={handlePrepare} disabled={preparing || !allSignersValid}>
-            {preparing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Preparing…
-              </>
-            ) : (
-              <>
-                <Send className="mr-2 h-4 w-4" /> Prepare to send
-              </>
-            )}
-          </Button>
+          {isFinalized ? (
+            <Button asChild variant="outline">
+              <Link href={`/dashboard/documents/${documentId}`}>Done</Link>
+            </Button>
+          ) : (
+            <Button onClick={handlePrepare} disabled={preparing || !allSignersValid}>
+              {preparing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Preparing…
+                </>
+              ) : (
+                <>
+                  <Send className="mr-2 h-4 w-4" /> Prepare to send
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -242,9 +291,30 @@ export default function ComposeDocumentPage() {
         />
 
         <aside className="space-y-6">
-          <section className="rounded-lg border bg-card p-4">
-            <SignerManager signers={signers} onChange={setSigners} />
-          </section>
+          {isFinalized ? (
+            <section className="rounded-lg border bg-card p-4 space-y-2">
+              <h3 className="text-sm font-semibold">Signers</h3>
+              <p className="text-xs text-muted-foreground">
+                Recipients are locked once a document is finalised. Manage
+                names and emails from the document detail page.
+              </p>
+              <ul className="space-y-1.5 pt-1">
+                {signers.map((s) => (
+                  <li key={s.id} className="flex items-center gap-2 text-sm">
+                    <span
+                      className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: s.color }}
+                    />
+                    <span className="truncate">{s.name || s.email}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : (
+            <section className="rounded-lg border bg-card p-4">
+              <SignerManager signers={signers} onChange={setSigners} />
+            </section>
+          )}
 
           <section className="rounded-lg border bg-card p-4">
             <FieldPalette editor={editor} roles={editorRoles} />

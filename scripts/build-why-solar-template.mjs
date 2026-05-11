@@ -59,14 +59,16 @@ const variable = (key, label) => ({
   type: "variable",
   attrs: { variableKey: key, label },
 });
-const field = ({ fieldType, recipientRoleId, label, required = true, options, placeholder }) => ({
+// Only signature fields are required by default; everything else is optional
+// so the signer can fill what they need to without being blocked.
+const field = ({ fieldType, recipientRoleId, label, required, options, placeholder }) => ({
   type: "signingField",
   attrs: {
     fieldKey: randomUUID(),
     fieldType,
     recipientRoleId,
     label,
-    required,
+    required: required ?? fieldType === "signature",
     options: options ?? null,
     placeholder: placeholder ?? null,
   },
