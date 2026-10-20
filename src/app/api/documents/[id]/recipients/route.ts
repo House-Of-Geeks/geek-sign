@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { documents, recipients } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { documentAccessClause, getUserTeamIds } from "@/lib/db/team-access";
+import { insertRecipient } from "@/lib/services/documents";
 
 export async function GET(
   request: NextRequest,
@@ -72,16 +73,7 @@ export async function POST(
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
 
-    const [recipient] = await db
-      .insert(recipients)
-      .values({
-        documentId: params.id,
-        email: email.trim(),
-        name: name?.trim() || null,
-        orderIndex: orderIndex ?? 0,
-        status: "pending",
-      })
-      .returning();
+    const recipient = await insertRecipient(params.id, { email, name, orderIndex });
 
     return NextResponse.json({ recipient });
   } catch (error) {

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { documents, recipients, documentFields } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { documents } from "@/lib/db/schema";
 import { documentAccessClause, getUserTeamIds } from "@/lib/db/team-access";
+import { getDocumentWithRecipientsAndFields } from "@/lib/services/documents";
 
 export async function GET(
   request: NextRequest,
@@ -16,34 +16,13 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const teamIds = await getUserTeamIds(session.user.id);
-    const [document] = await db
-      .select()
-      .from(documents)
-      .where(documentAccessClause(params.id, session.user.id, teamIds));
+    const result = await getDocumentWithRecipientsAndFields(params.id, session.user.id);
 
-    if (!document) {
-      return NextResponse.json({ error: "Document not found" }, { status: 404 });
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
-    // Get recipients
-    const documentRecipients = await db
-      .select()
-      .from(recipients)
-      .where(eq(recipients.documentId, params.id))
-      .orderBy(recipients.orderIndex);
-
-    // Get fields
-    const fields = await db
-      .select()
-      .from(documentFields)
-      .where(eq(documentFields.documentId, params.id));
-
-    return NextResponse.json({
-      document,
-      recipients: documentRecipients,
-      fields,
-    });
+    return NextResponse.json(result.data);
   } catch (error) {
     console.error("Get document error:", error);
     return NextResponse.json(

@@ -8,8 +8,7 @@ import {
   sendSenderDocumentSignedEmail,
   sendSenderDocumentCompletedEmail,
 } from "@/lib/email";
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://sign.houseofgeeks.online";
+import { APP_URL } from "@/lib/app-url";
 
 interface FieldUpdate {
   id: string;

@@ -3,8 +3,7 @@ import { db } from "@/lib/db";
 import { documents, recipients, users, auditLogs } from "@/lib/db/schema";
 import { eq, and, lte, isNotNull } from "drizzle-orm";
 import { sendSignerReminderEmail } from "@/lib/email";
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://sign.houseofgeeks.online";
+import { APP_URL } from "@/lib/app-url";
 
 export async function GET(request: NextRequest) {
   // Verify cron secret

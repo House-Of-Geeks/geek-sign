@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { documents, documentFields, recipients } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { documents, documentFields } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { documentAccessClause, getUserTeamIds } from "@/lib/db/team-access";
+import { insertField } from "@/lib/services/documents";
 
 export async function GET(
   request: NextRequest,
@@ -74,35 +75,21 @@ export async function POST(
       );
     }
 
-    // Verify recipient belongs to this document
-    const [recipient] = await db
-      .select()
-      .from(recipients)
-      .where(
-        and(
-          eq(recipients.id, recipientId),
-          eq(recipients.documentId, params.id)
-        )
-      );
+    const result = await insertField(params.id, {
+      recipientId,
+      type,
+      page,
+      xPosition,
+      yPosition,
+      width,
+      height,
+      required,
+    });
 
-    if (!recipient) {
-      return NextResponse.json({ error: "Recipient not found" }, { status: 404 });
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
     }
-
-    const [field] = await db
-      .insert(documentFields)
-      .values({
-        documentId: params.id,
-        recipientId,
-        type,
-        page: page ?? 1,
-        xPosition: xPosition ?? 100,
-        yPosition: yPosition ?? 100,
-        width: width ?? 200,
-        height: height ?? 60,
-        required: required ?? true,
-      })
-      .returning();
+    const field = result.data;
 
     return NextResponse.json({ field });
   } catch (error) {

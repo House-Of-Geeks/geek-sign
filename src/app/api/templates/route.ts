@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { templates, users, teamMembers } from "@/lib/db/schema";
-import { eq, desc, or, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { put } from "@vercel/blob";
 import { plansConfig } from "@/config/plans";
 import type { Plan } from "@/types";
 import { canUseRichtext } from "@/lib/features";
+import { listAccessibleTemplates } from "@/lib/services/templates";
 
 // GET all templates for the current user
 export async function GET() {
@@ -16,24 +17,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const memberships = await db
-      .select({ teamId: teamMembers.teamId })
-      .from(teamMembers)
-      .where(eq(teamMembers.userId, session.user.id));
-    const teamIds = memberships.map((m) => m.teamId);
-
-    const userTemplates = await db
-      .select()
-      .from(templates)
-      .where(
-        teamIds.length > 0
-          ? or(
-              eq(templates.userId, session.user.id),
-              inArray(templates.teamId, teamIds)
-            )
-          : eq(templates.userId, session.user.id)
-      )
-      .orderBy(desc(templates.createdAt));
+    const userTemplates = await listAccessibleTemplates(session.user.id);
 
     return NextResponse.json(userTemplates);
   } catch (error) {

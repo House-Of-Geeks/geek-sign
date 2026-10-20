@@ -1,35 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { templates, documents, recipients, documentFields, teamMembers } from "@/lib/db/schema";
-import { eq, and, or, inArray } from "drizzle-orm";
-import { put } from "@vercel/blob";
-import {
-  collectSigningFields,
-  remapFieldRoles,
-  substituteVariables,
-} from "@/lib/richtext/content-walk";
-
-async function getTeamIds(userId: string): Promise<string[]> {
-  const memberships = await db
-    .select({ teamId: teamMembers.teamId })
-    .from(teamMembers)
-    .where(eq(teamMembers.userId, userId));
-  return memberships.map((m) => m.teamId);
-}
-
-interface TemplateField {
-  id?: string;
-  label?: string;
-  type: string;
-  page: number;
-  xPosition: number;
-  yPosition: number;
-  width: number;
-  height: number;
-  required?: boolean;
-  recipientIndex?: number;
-}
+import { findAccessibleTemplate, createDocumentFromTemplate } from "@/lib/services/templates";
 
 // POST use template to create a new document
 export async function POST(
@@ -44,234 +15,28 @@ export async function POST(
 
     const { id } = await params;
 
-    // Get the template (own or team)
-    const teamIds = await getTeamIds(session.user.id);
-    const [template] = await db
-      .select()
-      .from(templates)
-      .where(
-        and(
-          eq(templates.id, id),
-          teamIds.length > 0
-            ? or(eq(templates.userId, session.user.id), inArray(templates.teamId, teamIds))
-            : eq(templates.userId, session.user.id)
-        )
-      )
-      .limit(1);
-
-    if (!template) {
-      return NextResponse.json({ error: "Template not found" }, { status: 404 });
-    }
-
-    const body = await request.json();
-    const {
-      title,
-      recipientEmails,
-      customMessage,
-      senderFieldValues,
-      senderUserId,
-      senderDisplayName,
-      variables,
-    } = body;
-
-    if (!title) {
-      return NextResponse.json(
-        { error: "Document title is required" },
-        { status: 400 }
-      );
-    }
-
-    if (!recipientEmails || !Array.isArray(recipientEmails) || recipientEmails.length === 0) {
-      return NextResponse.json(
-        { error: "At least one recipient email is required" },
-        { status: 400 }
-      );
-    }
-
-    const isRichtext = template.contentType === "richtext";
-
-    let fileUrl: string | null = template.fileUrl ?? null;
-    let fileName: string | null = template.name + ".pdf";
-
-    if (isRichtext) {
-      fileUrl = null;
-      fileName = null;
-    } else if (template.fileUrl) {
-      // Fetch the template file and re-upload to create a copy
-      const response = await fetch(template.fileUrl);
-      if (response.ok) {
-        const blob = await response.blob();
-        const uploadResult = await put(
-          `documents/${session.user.id}/${Date.now()}-${fileName}`,
-          blob,
-          { access: "public" }
-        );
-        fileUrl = uploadResult.url;
+    let body;
+    try {
+      body = await request.json();
+    } catch (parseError) {
+      // An unreadable body only matters once the template is known to exist.
+      if (!(await findAccessibleTemplate(id, session.user.id))) {
+        return NextResponse.json({ error: "Template not found" }, { status: 404 });
       }
-    } else {
-      return NextResponse.json(
-        { error: "Template has no associated file" },
-        { status: 400 }
-      );
+      throw parseError;
     }
 
-    // Validate senderUserId is a team member if provided.
-    // When delegating, also attach the document to a shared team so the
-    // session user retains access via the team-access clause.
-    let documentUserId = session.user.id;
-    let documentTeamId: string | null = null;
-    if (senderUserId && senderUserId !== session.user.id) {
-      const senderMembership = await db
-        .select({ teamId: teamMembers.teamId })
-        .from(teamMembers)
-        .where(
-          and(
-            eq(teamMembers.userId, senderUserId),
-            inArray(teamMembers.teamId, teamIds)
-          )
-        )
-        .limit(1);
-      if (senderMembership.length > 0) {
-        documentUserId = senderUserId;
-        documentTeamId =
-          template.teamId && teamIds.includes(template.teamId)
-            ? template.teamId
-            : senderMembership[0].teamId;
-      }
+    const result = await createDocumentFromTemplate(
+      id,
+      { userId: session.user.id, email: session.user.email },
+      body
+    );
+
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
-    // For richtext: substitute variable nodes with their provided values
-    // (the role remap below requires recipients to exist, so we do it after).
-    let documentContent: unknown = null;
-    if (isRichtext) {
-      const variableMap = (variables ?? {}) as Record<string, string>;
-      documentContent = substituteVariables(template.content, variableMap);
-    }
-
-    // Create the document
-    const [newDocument] = await db
-      .insert(documents)
-      .values({
-        userId: documentUserId,
-        teamId: documentTeamId,
-        title,
-        contentType: isRichtext ? "richtext" : "pdf",
-        content: documentContent,
-        variables: isRichtext ? (variables ?? null) : null,
-        fileUrl: fileUrl,
-        fileName: fileName,
-        status: "draft",
-        customMessage: customMessage || null,
-        senderDisplayName: senderDisplayName || null,
-      })
-      .returning();
-
-    // Create recipients
-    const createdRecipients: Array<{ id: string; email: string; orderIndex: number }> = [];
-    for (let i = 0; i < recipientEmails.length; i++) {
-      const email = recipientEmails[i];
-      const [recipient] = await db
-        .insert(recipients)
-        .values({
-          documentId: newDocument.id,
-          email: typeof email === "string" ? email : email.email,
-          name: typeof email === "object" ? email.name : null,
-          orderIndex: i,
-          status: "pending",
-        })
-        .returning();
-
-      createdRecipients.push({
-        id: recipient.id,
-        email: recipient.email,
-        orderIndex: i,
-      });
-    }
-
-    if (isRichtext) {
-      // Map template role UUIDs -> recipient indexes -> recipient DB ids.
-      const roles = (template.recipientRoles as Array<{ id: string }> | null) ?? [];
-      const roleIdToRecipientId = new Map<string, string>();
-      roles.forEach((r, i) => {
-        const recipient = createdRecipients[i] || createdRecipients[0];
-        if (recipient) roleIdToRecipientId.set(r.id, recipient.id);
-      });
-
-      // Rewrite signingField nodes so recipientRoleId now references the
-      // document's recipient UUID (not the template role UUID).
-      documentContent = remapFieldRoles(documentContent, roleIdToRecipientId);
-
-      // Now persist a document_fields row per inline signingField.
-      const inlineFields = collectSigningFields(documentContent);
-      for (const f of inlineFields) {
-        const recipientId =
-          roleIdToRecipientId.get(f.recipientRoleId) ??
-          (f.recipientRoleId || createdRecipients[0]?.id);
-        if (!recipientId) continue;
-        await db.insert(documentFields).values({
-          documentId: newDocument.id,
-          recipientId,
-          type: f.fieldType,
-          fieldKey: f.fieldKey,
-          required: f.required ?? true,
-        });
-      }
-
-      // Persist the remapped content
-      await db
-        .update(documents)
-        .set({ content: documentContent })
-        .where(eq(documents.id, newDocument.id));
-    } else if (template.fields && Array.isArray(template.fields)) {
-      const templateFields = template.fields as TemplateField[];
-
-      for (const field of templateFields) {
-        const recipientIndex = field.recipientIndex ?? 0;
-
-        if (recipientIndex === -1) {
-          // Sender-fill field: assign to recipient 0 with the sender's pre-filled value
-          const recipient = createdRecipients[0];
-          if (recipient) {
-            const fieldId = field.id || "";
-            const value = (senderFieldValues as Record<string, string> | undefined)?.[fieldId] || null;
-            await db.insert(documentFields).values({
-              documentId: newDocument.id,
-              recipientId: recipient.id,
-              type: "sender_paragraph",
-              page: field.page || 1,
-              xPosition: field.xPosition,
-              yPosition: field.yPosition,
-              width: field.width,
-              height: field.height,
-              required: false,
-              value,
-            });
-          }
-        } else {
-          // Normal recipient field
-          const recipient = createdRecipients[recipientIndex] || createdRecipients[0];
-          if (recipient) {
-            await db.insert(documentFields).values({
-              documentId: newDocument.id,
-              recipientId: recipient.id,
-              type: field.type,
-              page: field.page || 1,
-              xPosition: field.xPosition,
-              yPosition: field.yPosition,
-              width: field.width,
-              height: field.height,
-              required: field.required ?? true,
-            });
-          }
-        }
-      }
-    }
-
-    return NextResponse.json({
-      document: newDocument,
-      recipients: createdRecipients,
-      message: "Document created from template successfully",
-    }, { status: 201 });
+    return NextResponse.json(result.data, { status: 201 });
   } catch (error) {
     console.error("Error using template:", error);
     return NextResponse.json(
@@ -280,4 +45,3 @@ export async function POST(
     );
   }
 }
-
