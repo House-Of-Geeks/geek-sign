@@ -1,10 +1,10 @@
 import sgMail from "@sendgrid/mail";
+import { APP_URL } from "@/lib/app-url";
 
 // Initialize SendGrid - trim any whitespace/newlines from env vars
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY?.trim();
 const FROM_EMAIL = (process.env.FROM_EMAIL || "noreply@houseofgeeks.com.au").trim();
 const FROM_NAME = (process.env.FROM_NAME || "Geek Sign").trim();
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://sign.houseofgeeks.online";
 
 if (SENDGRID_API_KEY) {
   sgMail.setApiKey(SENDGRID_API_KEY);

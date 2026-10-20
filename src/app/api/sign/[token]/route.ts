@@ -5,8 +5,7 @@ import { eq } from "drizzle-orm";
 import { sendSenderDocumentViewedEmail } from "@/lib/email";
 import { plansConfig } from "@/config/plans";
 import type { Plan } from "@/types";
-
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://sign.houseofgeeks.online";
+import { APP_URL } from "@/lib/app-url";
 
 export async function GET(
   request: NextRequest,
