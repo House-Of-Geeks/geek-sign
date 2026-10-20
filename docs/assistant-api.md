@@ -104,6 +104,17 @@ curl -H "Authorization: Bearer $GEEKSIGN_ASSISTANT_KEY" "$GEEKSIGN_URL/api/assis
 
 Response: `{ document, recipients, fields }`. Each recipient has its status, view and sign times, consent, `fieldCount` and `completedFieldCount`. `fields` is `{ total, completed }`. Signing tokens, IP addresses and user agents are never returned.
 
+### `DELETE /api/assistant/documents/{id}`
+
+Delete a **draft** document. Documents that are pending, completed or voided return `409`.
+
+```bash
+curl -X DELETE -H "Authorization: Bearer $GEEKSIGN_ASSISTANT_KEY" \
+  "$GEEKSIGN_URL/api/assistant/documents/$DOC_ID"
+```
+
+Response: `{ deleted: true, documentId }`. The document's recipients, fields and audit log entries are deleted with it. The uploaded PDF is **not** removed from blob storage, the same as deleting from the dashboard.
+
 ### `POST /api/assistant/documents/{id}/recipients`
 
 Add signers (and their fields) to a **draft** document. Other statuses return `409`.
@@ -120,6 +131,32 @@ curl -X POST -H "Authorization: Bearer $GEEKSIGN_ASSISTANT_KEY" \
 ```
 
 Response `201`: `{ recipients, fieldsCreated }`.
+
+### `PATCH /api/assistant/documents/{id}/recipients/{recipientId}`
+
+Change a signer on a **draft** document. Other statuses return `409`.
+
+Body: any of `name` (up to 200 characters; an empty string or `null` clears it), `email`, `orderIndex` (0 or more). At least one is required, otherwise `400`. Other keys, including `status`, are ignored.
+
+```bash
+curl -X PATCH -H "Authorization: Bearer $GEEKSIGN_ASSISTANT_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"sam.new@example.com","orderIndex":1}' \
+  "$GEEKSIGN_URL/api/assistant/documents/$DOC_ID/recipients/$RECIPIENT_ID"
+```
+
+Response: `{ recipient }`. A recipient that is not on this document returns `404`.
+
+### `DELETE /api/assistant/documents/{id}/recipients/{recipientId}`
+
+Remove a signer, and the fields placed for them, from a **draft** document. Other statuses return `409`.
+
+```bash
+curl -X DELETE -H "Authorization: Bearer $GEEKSIGN_ASSISTANT_KEY" \
+  "$GEEKSIGN_URL/api/assistant/documents/$DOC_ID/recipients/$RECIPIENT_ID"
+```
+
+Response: `{ deleted: true, recipientId, fieldsDeleted }`.
 
 ### `POST /api/assistant/documents/{id}/send`
 
@@ -204,3 +241,4 @@ Response `201`: `{ document, recipients }`. The document is a draft with its fie
 1. **From a template:** `GET templates` then `POST templates/{id}/use` then `POST documents/{id}/send`.
 2. **From a PDF:** `POST documents` then `POST documents/{id}/recipients` (with `fields`) then `POST documents/{id}/send` or `activate`.
 3. **Follow up:** `GET documents?status=pending` then `POST documents/{id}/resend`, and `GET documents/{id}/download` once completed.
+4. **Fix a draft:** `GET documents/{id}` to see the signers, then `PATCH documents/{id}/recipients/{recipientId}` to correct a name, email or order (or `DELETE` the signer), or `DELETE documents/{id}` to throw away a draft you do not want. All of these only work while the document is a draft.

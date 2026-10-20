@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { documents, recipients, documentFields } from "@/lib/db/schema";
+import { documents, recipients } from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { documentAccessClause, getUserTeamIds } from "@/lib/db/team-access";
+import { deleteDocumentRecipient } from "@/lib/services/documents";
 
 export async function GET(
   request: NextRequest,
@@ -117,35 +118,12 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Verify document access (owner or team member)
-    const teamIds = await getUserTeamIds(session.user.id);
-    const [document] = await db
-      .select()
-      .from(documents)
-      .where(documentAccessClause(params.id, session.user.id, teamIds));
+    const result = await deleteDocumentRecipient(params.id, params.recipientId, session.user.id, {
+      draftOnly: false,
+    });
 
-    if (!document) {
-      return NextResponse.json({ error: "Document not found" }, { status: 404 });
-    }
-
-    // Delete associated fields first (cascade should handle this, but being explicit)
-    await db
-      .delete(documentFields)
-      .where(eq(documentFields.recipientId, params.recipientId));
-
-    // Delete recipient
-    const [recipient] = await db
-      .delete(recipients)
-      .where(
-        and(
-          eq(recipients.id, params.recipientId),
-          eq(recipients.documentId, params.id)
-        )
-      )
-      .returning();
-
-    if (!recipient) {
-      return NextResponse.json({ error: "Recipient not found" }, { status: 404 });
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
     return NextResponse.json({ success: true });
