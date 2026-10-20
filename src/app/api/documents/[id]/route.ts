@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { documents } from "@/lib/db/schema";
 import { documentAccessClause, getUserTeamIds } from "@/lib/db/team-access";
-import { getDocumentWithRecipientsAndFields } from "@/lib/services/documents";
+import { deleteDocument, getDocumentWithRecipientsAndFields } from "@/lib/services/documents";
 
 export async function GET(
   request: NextRequest,
@@ -88,14 +88,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const teamIds = await getUserTeamIds(session.user.id);
-    const [document] = await db
-      .delete(documents)
-      .where(documentAccessClause(params.id, session.user.id, teamIds))
-      .returning();
+    const result = await deleteDocument(params.id, session.user.id, { draftOnly: false });
 
-    if (!document) {
-      return NextResponse.json({ error: "Document not found" }, { status: 404 });
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
     return NextResponse.json({ success: true });

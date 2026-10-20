@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { presentDocument, presentRecipient } from "@/lib/assistant";
 import { assistantErrorResponse, requireAssistant, serviceErrorResponse, requireUuid } from "@/lib/assistantAccess";
 import { APP_URL } from "@/lib/app-url";
-import { getDocumentWithRecipientsAndFields } from "@/lib/services/documents";
+import { deleteDocument, getDocumentWithRecipientsAndFields } from "@/lib/services/documents";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +32,19 @@ export async function GET(request: Request, { params }: { params: { id: string }
         completed: fields.filter((f) => isComplete(f.value)).length,
       },
     });
+  } catch (error) {
+    return assistantErrorResponse(error);
+  }
+}
+
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+  try {
+    const { user } = await requireAssistant(request);
+    requireUuid(params.id, "Document not found");
+    const result = await deleteDocument(params.id, user.id, { draftOnly: true });
+    if (!result.ok) return serviceErrorResponse(result);
+
+    return NextResponse.json({ deleted: true, documentId: result.data.documentId });
   } catch (error) {
     return assistantErrorResponse(error);
   }

@@ -106,6 +106,23 @@ export const AssistantRecipientSchema = z.object({
   orderIndex: z.number().int().min(0).optional(),
 });
 
+/** Partial recipient edit. Unknown keys (such as `status`) are dropped. An empty or null name clears it. */
+export const AssistantUpdateRecipientSchema = z
+  .object({
+    email: z.string().trim().email("That email address isn't valid.").max(320).optional(),
+    name: z
+      .string()
+      .trim()
+      .max(200)
+      .nullable()
+      .optional()
+      .transform((name) => (name === undefined ? undefined : name || null)),
+    orderIndex: z.number().int().min(0).optional(),
+  })
+  .refine((v) => v.email !== undefined || v.name !== undefined || v.orderIndex !== undefined, {
+    message: "Send at least one of name, email or orderIndex.",
+  });
+
 export const AssistantFieldSchema = z.object({
   type: z.enum(["signature", "initials", "date", "text", "checkbox"]),
   page: z.number().int().min(1).default(1),

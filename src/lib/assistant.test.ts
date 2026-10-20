@@ -5,6 +5,7 @@ import {
   AssistantCreateDocumentSchema,
   AssistantFieldSchema,
   AssistantSendSchema,
+  AssistantUpdateRecipientSchema,
   AssistantUseTemplateSchema,
   MAX_PDF_BYTES,
   assistantAuthStatus,
@@ -111,6 +112,36 @@ describe("assistant schemas", () => {
     const many = Array.from({ length: 51 }, (_, i) => ({ email: `p${i}@example.com` }));
     assert.equal(AssistantAddRecipientsSchema.safeParse({ recipients: many }).success, false);
     assert.equal(AssistantAddRecipientsSchema.safeParse(null).success, false);
+  });
+  it("accepts partial recipient updates", () => {
+    assert.deepEqual(AssistantUpdateRecipientSchema.parse({ email: "  new@example.com " }), {
+      email: "new@example.com",
+    });
+    assert.equal(AssistantUpdateRecipientSchema.parse({ name: "  Sam  " }).name, "Sam");
+    assert.equal(AssistantUpdateRecipientSchema.parse({ orderIndex: 0 }).orderIndex, 0);
+    assert.equal(
+      AssistantUpdateRecipientSchema.safeParse({ name: "Sam", email: "s@example.com", orderIndex: 2 }).success,
+      true,
+    );
+  });
+  it("rejects empty or invalid recipient updates", () => {
+    assert.equal(AssistantUpdateRecipientSchema.safeParse({}).success, false);
+    assert.equal(AssistantUpdateRecipientSchema.safeParse({ unknown: true }).success, false);
+    assert.equal(AssistantUpdateRecipientSchema.safeParse({ email: "nope" }).success, false);
+    assert.equal(AssistantUpdateRecipientSchema.safeParse({ orderIndex: -1 }).success, false);
+    assert.equal(AssistantUpdateRecipientSchema.safeParse({ orderIndex: 1.5 }).success, false);
+    assert.equal(AssistantUpdateRecipientSchema.safeParse({ name: "x".repeat(201) }).success, false);
+    assert.equal(AssistantUpdateRecipientSchema.safeParse(null).success, false);
+  });
+  it("clears a recipient name with an empty string or null", () => {
+    assert.equal(AssistantUpdateRecipientSchema.parse({ name: "" }).name, null);
+    assert.equal(AssistantUpdateRecipientSchema.parse({ name: "   " }).name, null);
+    assert.equal(AssistantUpdateRecipientSchema.parse({ name: null }).name, null);
+  });
+  it("ignores a status key on recipient updates", () => {
+    const parsed = AssistantUpdateRecipientSchema.parse({ orderIndex: 1, status: "signed" });
+    assert.equal("status" in parsed, false);
+    assert.equal(AssistantUpdateRecipientSchema.safeParse({ status: "signed" }).success, false);
   });
   it("checks field geometry", () => {
     assert.equal(AssistantFieldSchema.safeParse({ type: "signature", xPosition: -1, yPosition: 0 }).success, false);

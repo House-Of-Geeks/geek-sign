@@ -203,6 +203,99 @@ export async function insertRecipient(documentId: string, input: RecipientInput)
   return recipient;
 }
 
+export type RecipientUpdates = {
+  email?: string;
+  /** `null` or an empty string clears the name. */
+  name?: string | null;
+  orderIndex?: number;
+  status?: string;
+};
+
+/**
+ * Update a recipient of a document the user can reach. With `draftOnly`, documents
+ * that are no longer drafts answer 409. Fields left undefined are not touched.
+ */
+export async function updateDocumentRecipient(
+  documentId: string,
+  recipientId: string,
+  userId: string,
+  updates: RecipientUpdates,
+  options: { draftOnly: boolean },
+): Promise<ServiceResult<RecipientRow>> {
+  const document = await findAccessibleDocument(documentId, userId);
+  if (!document) return fail(404, "Document not found");
+  if (options.draftOnly && document.status !== "draft") {
+    return fail(409, `Recipients can only be changed on draft documents. This document is ${document.status}.`);
+  }
+
+  const [recipient] = await db
+    .update(recipients)
+    .set({
+      ...(updates.email && { email: updates.email.trim() }),
+      ...(updates.name !== undefined && { name: updates.name?.trim() || null }),
+      ...(updates.orderIndex !== undefined && { orderIndex: updates.orderIndex }),
+      ...(updates.status && { status: updates.status }),
+    })
+    .where(and(eq(recipients.id, recipientId), eq(recipients.documentId, documentId)))
+    .returning();
+
+  if (!recipient) return fail(404, "Recipient not found");
+  return ok(recipient);
+}
+
+/** Remove a recipient and their fields from a document the user can reach. */
+export async function deleteDocumentRecipient(
+  documentId: string,
+  recipientId: string,
+  userId: string,
+  options: { draftOnly: boolean },
+): Promise<ServiceResult<{ recipientId: string; fieldsDeleted: number }>> {
+  const document = await findAccessibleDocument(documentId, userId);
+  if (!document) return fail(404, "Document not found");
+  if (options.draftOnly && document.status !== "draft") {
+    return fail(409, `Recipients can only be removed from draft documents. This document is ${document.status}.`);
+  }
+
+  // Delete associated fields first (cascade should handle this, but being explicit)
+  const deletedFields = await db
+    .delete(documentFields)
+    .where(and(eq(documentFields.recipientId, recipientId), eq(documentFields.documentId, documentId)))
+    .returning({ id: documentFields.id });
+
+  const [recipient] = await db
+    .delete(recipients)
+    .where(and(eq(recipients.id, recipientId), eq(recipients.documentId, documentId)))
+    .returning({ id: recipients.id });
+
+  if (!recipient) return fail(404, "Recipient not found");
+  return ok({ recipientId: recipient.id, fieldsDeleted: deletedFields.length });
+}
+
+/**
+ * Delete a document the user can reach; recipients, fields and audit logs go with it by cascade.
+ * The stored file is left in blob storage. With `draftOnly`, the status check is part of the
+ * DELETE itself so a document sent in the meantime is never removed.
+ */
+export async function deleteDocument(
+  documentId: string,
+  userId: string,
+  options: { draftOnly: boolean },
+): Promise<ServiceResult<{ documentId: string }>> {
+  const teamIds = await getUserTeamIds(userId);
+  const access = documentAccessClause(documentId, userId, teamIds);
+  const [deleted] = await db
+    .delete(documents)
+    .where(options.draftOnly ? and(access, eq(documents.status, "draft")) : access)
+    .returning({ id: documents.id });
+  if (deleted) return ok({ documentId: deleted.id });
+
+  if (options.draftOnly) {
+    const existing = await findAccessibleDocument(documentId, userId);
+    if (existing) return fail(409, `Only draft documents can be deleted. This document is ${existing.status}.`);
+  }
+  return fail(404, "Document not found");
+}
+
 export type FieldInput = {
   recipientId: string;
   type: string;
